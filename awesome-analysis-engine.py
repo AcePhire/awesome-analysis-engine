@@ -8,11 +8,20 @@ import csv
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
+# Load environment variables
 load_dotenv()
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 MALWAREBAZAAR_API_KEY = os.getenv("MALWAREBAZAAR_API_KEY")
 
+
+MOBSF_API_KEY = "515d3578262a2539cd13b5b9946fe17e350c321b91faeb1ee56095430242a4a9"
+MOBSF_PORT = "8181"
+MOBSF_DOMAIN = f"http://127.0.0.1:{MOBSF_PORT}"
+
+# Load docker daemon
 client = docker.from_env()
 
 # Hash the app file
@@ -52,11 +61,70 @@ def tag_results(tool, results):
 
 # Save report to a JSON file
 def saveReport(report, output_file):
-    with open(f"/reports/{output_file}", "w") as file:
+    with open(f"reports/{output_file}", "w") as file:
         json.dump(report, file, indent=2)
 
-def run_mobsf():
-    container = client.containers.run("opensecurity/mobile-security-framework-mobsf:latest", detach=True, environment=["MOBSF_API_ONLY=0", "MOBSF_API_KEY=515d3578262a2539cd13b5b9946fe17e350c321b91faeb1ee56095430242a4a9"])
+def run_mobsf(port):
+    container = client.containers.run(
+        "opensecurity/mobile-security-framework-mobsf:latest", 
+        detach=True, 
+        environment=[
+            "MOBSF_API_ONLY=0", 
+            f"MOBSF_API_KEY={MOBSF_API_KEY}"
+        ],
+        ports={
+            "8000": MOBSF_PORT
+        }
+    )
+
+    return container
+
+def upload_file_to_mobsf(path):
+    file, directory = resolve_path(path)
+    
+    url = f"{MOBSF_DOMAIN}/api/v1/upload"
+    multipart_data = MultipartEncoder(fields={'file': (file, open(path, 'rb'), 'application/octet-stream')})
+    headers = { "Authorization": MOBSF_API_KEY, "Content-Type": multipart_data.content_type }
+
+    try:
+        response = requests.post(url, data=multipart_data, headers=headers)
+
+        return response.json()["hash"]
+    except:
+        return hash_file(path)
+
+def scan_file_in_mobsf(hash):
+    url = f"{MOBSF_DOMAIN}/api/v1/scan"
+    headers = { "Authorization": MOBSF_API_KEY }
+    data = { "hash": hash }
+
+    try:
+        with open(path, "rb") as file:
+            response = requests.post(url, data=data, headers=headers)
+
+            return response.json()
+    except:
+        print("Couldn't scan file!")
+
+# Analyze using MobSF
+def mobsf_analysis(path):
+    file, directory = resolve_path(path)
+
+    port = "8181"
+    #container = run_mobsf(port)
+ 
+    try:
+        hash = upload_file_to_mobsf(path)
+
+        if hash:
+            data = scan_file_in_mobsf(hash)
+    except:
+        data = "{}"
+
+    print("mobsf_analysis.........complete!")
+    return tag_results("mobsf", json_formatter(data))
+
+    #container.stop()
 
 # Analyze using APKiD
 def apkid_analysis(path):
@@ -72,6 +140,7 @@ def apkid_analysis(path):
     except:
         data = "{}"
 
+    print("apkid_analysis.........complete!")
     return tag_results("apkid", data)
 
 # Analyze using ssdeep
@@ -90,6 +159,7 @@ def ssdeep_analysis(path):
     except:
         data = "{}"
 
+    print("ssdeep_analysis.........complete!")
     return tag_results("ssdeep", data)
 
 # Analyze using Quark Engine
@@ -111,6 +181,7 @@ def quark_engine_analysis(path):
     except:
         data = "{}"
 
+    print("quark_engine_analysis.........complete!")
     return tag_results("quark_engine", data)
 
 
@@ -133,6 +204,7 @@ def androcfg_analysis(path):
     except:
         data = "{}"
     
+    print("androcfg_analysis.........complete!")
     return tag_results("androcfg", data)
 
 # Analyze using VirusTotal
@@ -152,6 +224,7 @@ def virustotal_analysis(path):
     except:
         data = "{}"
 
+    print("virustotal_analysis.........complete!")
     return tag_results("virustotal", json_formatter(data))
 
 
@@ -175,6 +248,7 @@ def malwarebazaar_analysis(path):
     except:
         data = "{}"
     
+    print("malwarebazaar_analysis.........complete!")
     return tag_results("malware_bazaar", json_formatter(data))
 
 # Get APK info
@@ -192,35 +266,46 @@ def apk_info_analysis(path):
     except:
         data = "{}"
 
+    print("apk_info_analysis.........complete!")
     return tag_results("apk_info", data)
 
-# Analyze using LOKI-RS
-def loki_analysis(path):
+# Analyze using Yara Analyzer
+def yara_analysis(path):
     file, directory = resolve_path(path)
+    rules_path = "/home/acephire/Documents/projects/awesome-analysis-engine/yara_analyzer/rules/"
 
-    container = client.containers.run(
-        "acephire/loki-rs", 
-        volumes=[f"{directory}:/analysis:ro"], 
-        command=[
-            "/bin/bash", 
-            "-c", 
-            "./loki-util update > /dev/null && ./loki --no-tui --no-log --no-html --no-procs -f /analysis/ -j output.json > /dev/null && cat output.json"
-        ]
-    )
+    try:
+        container = client.containers.run(
+            "acephire/yara_analyzer", 
+            volumes=[
+                f"{directory}:/analysis:ro",
+                f"{rules_path}:/rules/:ro"
+            ], 
+            command=[
+                f"/analysis/{file}",
+                "/rules/android.yara"
+            ]
+        )
 
-    data = container.decode("utf-8")
-    return tag_results("loki", data)
+        data = container.decode("utf-8")
+    except:
+        data = "{}"
+
+    print("yara_analysis.........complete!")
+    return tag_results("yara_analyzer", data)
 
 # Analyze APK using multiple tools
 def analyze(path):
     report = [
+        mobsf_analysis(path),
         apkid_analysis(path), 
         ssdeep_analysis(path),
         quark_engine_analysis(path),
         androcfg_analysis(path),
         virustotal_analysis(path),
         malwarebazaar_analysis(path),
-        apk_info_analysis(path)
+        apk_info_analysis(path),
+        yara_analysis(path)
     ]
 
     return report
