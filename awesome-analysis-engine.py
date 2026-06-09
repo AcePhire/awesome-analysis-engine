@@ -296,7 +296,11 @@ def yara_analysis(path):
 
 # Analyze APK using multiple tools
 def analyze(path):
+    upload_timestamp = {
+            "upload_to_fukhara_timestamp": str(datetime.now())
+    }
     report = [
+        upload_timestamp,
         mobsf_analysis(path),
         apkid_analysis(path), 
         ssdeep_analysis(path),
