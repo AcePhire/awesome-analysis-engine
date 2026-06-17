@@ -1,6 +1,6 @@
 version: "3"
 services:
-  db:
+  postgres:
     image: postgres
     restart: always
     environment:
@@ -9,6 +9,25 @@ services:
       POSTGRES_PASSWORD: fukhara
     ports:
       - 5432:5432
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: fukhara
+      MONGO_INITDB_ROOT_PASSWORD: fukhara
+    ports:
+      - 27017:27017
+  mongo-express:
+    image: mongo-express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: fukhara
+      ME_CONFIG_MONGODB_ADMINPASSWORD: fukhara
+      ME_CONFIG_BASICAUTH_USERNAME: fukhara
+      ME_CONFIG_BASICAUTH_PASSWORD: fukhara
+      ME_CONFIG_MONGODB_URL: mongodb://fukhara:fukhara@mongo:27017/
+    ports:
+      - 8081:8081
   mobsf:
     image: opensecurity/mobile-security-framework-mobsf:latest
     environment:
