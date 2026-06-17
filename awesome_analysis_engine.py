@@ -47,5 +47,3 @@ if __name__ == "__main__":
 
     path = sys.argv[1]
     analyze(path)
-    # report_id = hash_file(path)
-    # saveReport(report, f"{report_id}.json")

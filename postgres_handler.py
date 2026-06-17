@@ -100,7 +100,7 @@ def add_ssdeep_hash(apk_id, filename, ssdeep_hash):
         print(e)
 
 
-def add_tool_analysis(tool, results, file_hash):
+def add_tool_analysis(file_hash, tool, results):
     try:
         connection = psycopg2.connect(
             user="postgres",
