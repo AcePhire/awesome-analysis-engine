@@ -1,5 +1,6 @@
 import json
 import os
+import timeit
 
 import docker
 import requests
@@ -20,8 +21,6 @@ client = docker.from_env()
 
 # Analyze using MobSF
 def mobsf_analysis(path):
-    file_hash = hash_file(path)
-
     port = "8181"
     # container = run_mobsf(port)
 
@@ -32,8 +31,8 @@ def mobsf_analysis(path):
     except:
         data = "{}"
 
-    add_tool_analysis("MOBSF_ANALYSIS", data, file_hash)
     print("mobsf_analysis.........complete!")
+    return data
 
     # container.stop()
 
@@ -41,7 +40,6 @@ def mobsf_analysis(path):
 # Analyze using APKiD
 def apkid_analysis(path):
     file, directory = resolve_path(path)
-    file_hash = hash_file(path)
 
     try:
         container = client.containers.run(
@@ -51,8 +49,8 @@ def apkid_analysis(path):
     except:
         data = "{}"
 
-    add_tool_analysis("APKID_ANALYSIS", data, file_hash)
     print("apkid_analysis.........complete!")
+    return data
 
 
 # Analyze using ssdeep
@@ -77,7 +75,13 @@ def ssdeep_analysis(path):
     for file in data:
         filename = file["filename"]
         ssdeep_hash = file["blocksize:hash:hash"]
-        add_ssdeep_hash(apk_id, filename, ssdeep_hash)
+        print(
+            "add_ssdeep_hash() took",
+            timeit.timeit(
+                lambda: add_ssdeep_hash(apk_id, filename, ssdeep_hash), number=1
+            ),
+            "seconds",
+        )
 
     print("ssdeep_analysis.........complete!")
 
@@ -85,7 +89,6 @@ def ssdeep_analysis(path):
 # Analyze using Quark Engine
 def quark_engine_analysis(path):
     file, directory = resolve_path(path)
-    file_hash = hash_file(path)
 
     try:
         container = client.containers.run(
@@ -104,14 +107,13 @@ def quark_engine_analysis(path):
         print(e)
         data = "{}"
 
-    add_tool_analysis("QUARK_ENGINE_ANALYSIS", data, file_hash)
     print("quark_engine_analysis.........complete!")
+    return data
 
 
 # Analyze using AndroCFG
 def androcfg_analysis(path):
     file, directory = resolve_path(path)
-    file_hash = hash_file(path)
 
     try:
         container = client.containers.run(
@@ -128,8 +130,8 @@ def androcfg_analysis(path):
     except:
         data = "{}"
 
-    add_tool_analysis("ANDROCFG_ANALYSIS", data, file_hash)
     print("androcfg_analysis.........complete!")
+    return data
 
 
 # Analyze using VirusTotal
@@ -146,8 +148,8 @@ def virustotal_analysis(path):
     except:
         data = "{}"
 
-    add_tool_analysis("VIRUSTOTAL_ANALYSIS", data, file_hash)
     print("virustotal_analysis.........complete!")
+    return data
 
 
 # Analyze using Malware Bazaar
@@ -165,14 +167,13 @@ def malwarebazaar_analysis(path):
     except:
         data = "{}"
 
-    add_tool_analysis("MALWAREBAZAAR_ANALYSIS", data, file_hash)
     print("malwarebazaar_analysis.........complete!")
+    return data
 
 
 # Get APK info
 def apk_info_analysis(path):
     file, directory = resolve_path(path)
-    file_hash = hash_file(path)
 
     try:
         container = client.containers.run(
@@ -186,13 +187,12 @@ def apk_info_analysis(path):
         data = "{}"
 
     print("apk_info_analysis.........complete!")
-    add_tool_analysis("APK_INFO_ANALYSIS", data, file_hash)
+    return data
 
 
 # Analyze using Yara Analyzer
 def yara_analysis(path):
     file, directory = resolve_path(path)
-    file_hash = hash_file(path)
     rules_path = (
         "/home/acephire/Documents/projects/awesome-analysis-engine/yara_analyzer/rules/"
     )
@@ -208,5 +208,5 @@ def yara_analysis(path):
     except:
         data = "{}"
 
-    add_tool_analysis("YARA_ANALYSIS", data, file_hash)
     print("yara_analysis.........complete!")
+    return data
