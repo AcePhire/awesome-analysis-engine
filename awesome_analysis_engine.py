@@ -20,7 +20,9 @@ def analyze(path):
     apkid_data = apkid_analysis(path)
     add_tool_analysis("APKID_ANALYSIS", apkid_data, file_hash)
 
-    ssdeep_analysis(path)
+    ssdeep_hashes = ssdeep_analysis(path)
+    for ssdeep_hash in ssdeep_hashes:
+        add_ssdeep_hash(get_apk_id(file_hash), ssdeep_hash[0], ssdeep_hash[1])
 
     quark_engine_data = quark_engine_analysis(path)
     add_tool_analysis("QUARK_ENGINE_ANALYSIS", quark_engine_data, file_hash)
@@ -42,11 +44,7 @@ def analyze(path):
 
 
 if __name__ == "__main__":
-    print(
-        "initalizeDatabase() took",
-        timeit.timeit(lambda: initalizeDatabase(), number=1),
-        "seconds",
-    )
+    initalizeDatabase()
 
     if len(sys.argv) == 1:
         print("No path given!")

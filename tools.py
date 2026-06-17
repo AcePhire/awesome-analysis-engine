@@ -72,18 +72,14 @@ def ssdeep_analysis(path):
     except:
         data = "{}"
 
+    ssdeep_hashes = []
     for file in data:
         filename = file["filename"]
         ssdeep_hash = file["blocksize:hash:hash"]
-        print(
-            "add_ssdeep_hash() took",
-            timeit.timeit(
-                lambda: add_ssdeep_hash(apk_id, filename, ssdeep_hash), number=1
-            ),
-            "seconds",
-        )
+        ssdeep_hashes.append((filename, ssdeep_hash))
 
     print("ssdeep_analysis.........complete!")
+    return ssdeep_hashes
 
 
 # Analyze using Quark Engine
