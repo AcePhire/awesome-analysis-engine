@@ -47,30 +47,23 @@ def initalizeDatabase():
                 SHA256 VARCHAR(64) UNIQUE NOT NULL,
                 UPLOADED_AT TIMESTAMP NOT NULL,
                 APK_FILENAME VARCHAR(255) NULL,
-                MOBSF_ANALYSIS JSONB,
-                APKID_ANALYSIS JSONB,
-                QUARK_ENGINE_ANALYSIS JSONB,
-                ANDROCFG_ANALYSIS JSONB,
-                VIRUSTOTAL_ANALYSIS JSONB,
-                MALWAREBAZAAR_ANALYSIS JSONB,
-                APK_INFO_ANALYSIS JSONB,
-                YARA_ANALYSIS JSONB);
+                ANALYSIS_RESULTS JSONB[]);
         """
         cursor.execute(create_apk_analysis_table_query)
         connection.commit()
         print("apk_analysis table created!")
 
-        create_ssdeep_hash_table_query = """
-        CREATE TABLE IF NOT EXISTS ssdeep_hash (
+        create_fuzzy_hash_table_query = """
+        CREATE TABLE IF NOT EXISTS fuzzy_hash (
                 ID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY NOT NULL,
                 FILENAME VARCHAR(255) NOT NULL,
-                SSDEEP_HASH VARCHAR UNIQUE NOT NULL,
+                HASH VARCHAR UNIQUE NOT NULL,
                 APK_ID INT NOT NULL,
                 FOREIGN KEY (APK_ID) REFERENCES apk_analysis(ID));
         """
-        cursor.execute(create_ssdeep_hash_table_query)
+        cursor.execute(create_fuzzy_hash_table_query)
         connection.commit()
-        print("ssdeep_hash table created!")
+        print("fuzzy_hash table created!")
     except Exception as e:
         print("Failed to initialize database!")
         print(e)
@@ -103,6 +96,7 @@ def add_apk_analysis(path):
         print("Failed to add apk analysis!")
         print(e)
 
+
 def add_ssdeep_hash(apk_id, filename, ssdeep_hash):
     try:
         connection = psycopg2.connect(
@@ -116,9 +110,9 @@ def add_ssdeep_hash(apk_id, filename, ssdeep_hash):
         cursor = connection.cursor()
 
         insert_query = f"""
-        INSERT INTO ssdeep_hash (FILENAME, SSDEEP_HASH, APK_ID)
+        INSERT INTO fuzzy_hash (FILENAME, HASH, APK_ID)
         VALUES ('{filename}', '{ssdeep_hash}', '{apk_id}')
-        ON CONFLICT (SSDEEP_HASH) DO NOTHING
+        ON CONFLICT (HASH) DO NOTHING
         """
         cursor.execute(insert_query)
         connection.commit()
@@ -128,7 +122,7 @@ def add_ssdeep_hash(apk_id, filename, ssdeep_hash):
         print(e)
 
 
-def add_tool_analysis(tool_analysis, results, file_hash):
+def add_tool_analysis(tool, results, file_hash):
     try:
         connection = psycopg2.connect(
             user="postgres",
@@ -140,16 +134,20 @@ def add_tool_analysis(tool_analysis, results, file_hash):
 
         cursor = connection.cursor()
 
+        tagged_results = tag_results(tool, results)
+
+        print(tagged_results)
+
         update_query = f"""
         UPDATE apk_analysis
-        SET {tool_analysis} = %s::jsonb
+        SET ANALYSIS_RESULTS = ANALYSIS_RESULTS || %s::jsonb
         WHERE sha256 = '{file_hash}'
         """
-        cursor.execute(update_query, (json.dumps(results),))
+        cursor.execute(update_query, (json.dumps(tagged_results),))
         connection.commit()
 
     except Exception as e:
-        print(f"Failed to add {tool_analysis}!")
+        print(f"Failed to add {tool}!")
         print(e)
 
 
@@ -215,8 +213,7 @@ def csv_to_json(data):
 def tag_results(tool, results):
     return {
         "tool": tool,
-        "timestamp": str(datetime.now()),
-        "tool_results": json.loads(results),
+        "tool_results": results,
     }
 
 
@@ -312,7 +309,6 @@ def ssdeep_analysis(path):
     file, directory = resolve_path(path)
     file_hash = hash_file(path)
 
-
     try:
         container = client.containers.run(
             "cincan/ssdeep",
@@ -389,17 +385,14 @@ def androcfg_analysis(path):
 def virustotal_analysis(path):
     file_hash = hash_file(path)
 
-    headers = {
-        "accept": "application/json",
-        "x-apikey": VIRUSTOTAL_API_KEY
-    }
+    headers = {"accept": "application/json", "x-apikey": VIRUSTOTAL_API_KEY}
     url = f"https://www.virustotal.com/api/v3/files/{file_hash}"
 
     try:
         response = requests.get(url, headers=headers)
 
         data = response.json()
-    except: 
+    except:
         data = "{}"
 
     add_tool_analysis("VIRUSTOTAL_ANALYSIS", data, file_hash)
@@ -410,20 +403,15 @@ def virustotal_analysis(path):
 def malwarebazaar_analysis(path):
     file_hash = hash_file(path)
 
-    headers = {
-        "Auth-Key": MALWAREBAZAAR_API_KEY
-    }
-    data_query = {
-        "query": "get_info",
-        "hash": file_hash
-    }
+    headers = {"Auth-Key": MALWAREBAZAAR_API_KEY}
+    data_query = {"query": "get_info", "hash": file_hash}
     url = "https://mb-api.abuse.ch/api/v1/"
 
     try:
         response = requests.post(url, data=data_query, headers=headers)
 
         data = response.json()
-    except: 
+    except:
         data = "{}"
 
     add_tool_analysis("MALWAREBAZAAR_ANALYSIS", data, file_hash)
