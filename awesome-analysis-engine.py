@@ -136,8 +136,6 @@ def add_tool_analysis(tool, results, file_hash):
 
         tagged_results = tag_results(tool, results)
 
-        print(tagged_results)
-
         update_query = f"""
         UPDATE apk_analysis
         SET ANALYSIS_RESULTS = ANALYSIS_RESULTS || %s::jsonb
