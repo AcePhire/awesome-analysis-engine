@@ -7,7 +7,6 @@ import requests
 from dotenv import load_dotenv
 
 from mobsf_handler import scan_file_in_mobsf, upload_file_to_mobsf
-from postgres_handler import add_ssdeep_hash, add_tool_analysis, get_apk_id
 from utils import csv_to_json, hash_file, resolve_path
 
 # Load environment variables
@@ -67,8 +66,6 @@ def ssdeep_analysis(path):
 
         csv_data = container.decode("utf-8").strip("ssdeep,1.1--")
         data = json.loads(csv_to_json(csv_data))
-
-        apk_id = get_apk_id(file_hash)
     except:
         data = "{}"
 
