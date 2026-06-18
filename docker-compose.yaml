@@ -28,6 +28,28 @@ services:
       ME_CONFIG_MONGODB_URL: mongodb://fukhara:fukhara@mongo:27017/
     ports:
       - 8081:8081
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.4
+    hostname: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms1000m -Xmx1000m
+      - ELASTIC_PASSWORD=fukhara
+    ports:
+      - 9200:9200
+      - 9300:9300
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.2.4
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=fukhara
+    depends_on:
+      - elasticsearch
+    ports:
+      - 5601:5601
   mobsf:
     image: opensecurity/mobile-security-framework-mobsf:latest
     environment:
