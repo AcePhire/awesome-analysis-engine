@@ -12,11 +12,11 @@ async def run_analysis_tool(analysis_func, name, path):
     add_tool_analysis(file_hash, name, result)
 
 
-async def run_fuzzy_hash_analysis(path):
+async def run_fuzzy_hashes_analysis(fuzzy_hash_func, name, path):
     file_hash = hash_file(path)
-    ssdeep_hashes = ssdeep_analysis(path)
-    for ssdeep_hash in ssdeep_hashes:
-        add_fuzzy_hash(file_hash, {ssdeep_hash[0]: ssdeep_hash[1]})
+    fuzzy_hashes = await asyncio.to_thread(fuzzy_hash_func, path)
+    for fuzzy_hash in fuzzy_hashes:
+        add_fuzzy_hash(file_hash, name, fuzzy_hash[0], fuzzy_hash[1])
 
 
 # Analyze APK using multiple tools
@@ -26,7 +26,7 @@ async def analyze(path):
     await asyncio.gather(
         run_analysis_tool(mobsf_analysis, "mobsf", path),
         run_analysis_tool(apkid_analysis, "apkid", path),
-        run_fuzzy_hash_analysis(path),
+        run_fuzzy_hashes_analysis(ssdeep_analysis, "ssdeep", path),
         run_analysis_tool(quark_engine_analysis, "quark_engine", path),
         run_analysis_tool(androcfg_analysis, "androcfg", path),
         run_analysis_tool(virustotal_analysis, "virustotal", path),

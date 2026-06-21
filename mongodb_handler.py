@@ -1,6 +1,8 @@
 from datetime import datetime
+from enum import unique
 
 from pymongo import MongoClient
+from pymongo.operations import IndexModel
 
 from utils import hash_file
 
@@ -18,6 +20,10 @@ def _get_apk_analysis_collection():
     return _get_db()["apk_analysis"]
 
 
+def _get_fuzzy_hashes_collection():
+    return _get_db()["fuzzy_hashes"]
+
+
 def create_apk_analysis(path):
     try:
         sha256 = hash_file(path)
@@ -29,13 +35,25 @@ def create_apk_analysis(path):
         pass
 
 
+def add_fuzzy_hash(sha256, tool, filename, fuzzy_hash):
+    indexes = [
+        IndexModel(keys={"sha256": 1}, unique=True),
+        IndexModel(keys={"tool": 1}, unique=True),
+    ]
+    _get_fuzzy_hashes_collection().create_indexes(indexes)
+    try:
+        fh = {
+            "sha256": sha256,
+            "tool": tool,
+            "filename": filename,
+            "fuzzy_hash": fuzzy_hash,
+        }
+        _get_fuzzy_hashes_collection().insert_one(fh)
+    except:
+        pass
+
+
 def add_tool_analysis(sha256, tool_name, result):
     _get_apk_analysis_collection().update_one(
         {"sha256": sha256}, {"$set": {tool_name: result}}
-    )
-
-
-def add_fuzzy_hash(sha256, fuzzy_hash):
-    _get_apk_analysis_collection().update_one(
-        {"sha256": sha256}, {"$addToSet": {"fuzzy_hashes": fuzzy_hash}}
     )
