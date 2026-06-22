@@ -36,11 +36,6 @@ def create_apk_analysis(path):
 
 
 def add_fuzzy_hash(sha256, tool, filename, fuzzy_hash):
-    indexes = [
-        IndexModel(keys={"sha256": 1}, unique=True),
-        IndexModel(keys={"tool": 1}, unique=True),
-    ]
-    _get_fuzzy_hashes_collection().create_indexes(indexes)
     try:
         fh = {
             "sha256": sha256,
@@ -57,14 +52,6 @@ def add_tool_analysis(sha256, tool_name, result):
     _get_apk_analysis_collection().update_one(
         {"sha256": sha256}, {"$set": {tool_name: result}}
     )
-<<<<<<< HEAD
-=======
-
-
-def add_fuzzy_hash(sha256, fuzzy_hash):
-    _get_apk_analysis_collection().update_one(
-        {"sha256": sha256}, {"$addToSet": {"fuzzy_hashes": fuzzy_hash}}
-    )
 
 
 def list_apk_analyses():
@@ -76,7 +63,14 @@ def get_tool_analysis(sha256, tool_name):
 
 
 def get_fuzzy_hash_analysis(sha256, tool_name):
-    return (
-        _get_apk_analysis_collection().find_one({"sha256": sha256}).get("fuzzy_hashes")
+    fuzzy_hashes = _get_fuzzy_hashes_collection().find(
+        {"sha256": sha256, "tool": tool_name}
     )
->>>>>>> origin/mongo-x-api
+
+    return list(fuzzy_hashes)
+
+
+def get_apk_analysis_upload_timestamp(sha256):
+    return (
+        _get_apk_analysis_collection().find_one({"sha256": sha256}).get("uploaded_at")
+    )

@@ -56,7 +56,6 @@ def apkid_analysis(path):
 # Analyze using ssdeep
 def ssdeep_analysis(path):
     file, directory = resolve_path(path)
-    file_hash = hash_file(path)
 
     try:
         container = client.containers.run(

@@ -1,10 +1,12 @@
 import json
+from calendar import c
 from datetime import datetime
-from webbrowser import get
 
 from fastapi import FastAPI
+from requests.api import get
 
 from mongodb_handler import (
+    get_apk_analysis_upload_timestamp,
     get_fuzzy_hash_analysis,
     get_tool_analysis,
     list_apk_analyses,
@@ -41,7 +43,8 @@ def prepare_apkid_output(sha256):
     computed_with = "apkid"
     try:
         apkid_output = get_tool_analysis(sha256, computed_with)
-        apkid = {"files": apkid_output["files"]}
+        print(apkid_output)
+        apkid = {"files": apkid_output}
 
         return apkid, computed_with
     except:
@@ -49,9 +52,14 @@ def prepare_apkid_output(sha256):
 
 
 def prepare_fuzzy_hash_output(sha256):
-    computed_with = "ssdeep"
+    computed_with = ["ssdeep"]
     try:
-        fuzzy_hashes = get_fuzzy_hash_analysis(sha256, computed_with)
+        fuzzy_hashes = {}
+        for tool in computed_with:
+            tool_output = get_fuzzy_hash_analysis(sha256, tool)
+            fuzzy_hashes[tool] = {
+                item["filename"]: item["fuzzy_hash"] for item in tool_output
+            }
 
         return fuzzy_hashes, computed_with
     except:
@@ -75,11 +83,13 @@ def prepare_fingerprints_output(sha256):
 ################################################# THREAT INTELLIGENCE  #################################################
 
 
-def prepare_sample_timeline_output(report):
+def prepare_sample_timeline_output(sha256):
     computed_with = ["fukhara", "virustotal"]
     try:
-        upload_timestamp = report[0]["upload_to_fukhara_timestamp"]
-        virustotal_output = report[6]["tool_results"]["attributes"]
+        upload_timestamp = get_apk_analysis_upload_timestamp(sha256)
+        virustotal_output = get_tool_analysis(sha256, "virustotal")["data"][
+            "attributes"
+        ]
 
         sample_timeline = {
             "oldest_file_found_in_apk": virustotal_output["bundle_info"][
@@ -108,30 +118,30 @@ def prepare_sample_timeline_output(report):
         return {}, computed_with
 
 
-def prepare_virustotal_output(report):
+def prepare_virustotal_output(sha256):
     computed_with = "virustotal"
     try:
-        virustotal_output = {"output": report[6]["tool_results"]["attributes"]}
+        virustotal_output = get_tool_analysis(sha256, computed_with)["data"]
 
         return virustotal_output, computed_with
     except:
         return {}, computed_with
 
 
-def prepare_malwarebazaar_output(report):
+def prepare_malwarebazaar_output(sha256):
     computed_with = "malwarebazaar"
     try:
-        malwarebazaar_output = {"output": report[7]["tool_results"]}
+        malwarebazaar_output = get_tool_analysis(sha256, computed_with)["data"]
 
         return malwarebazaar_output, computed_with
     except:
         return {}, computed_with
 
 
-def prepare_yara_analysis_output(report):
-    computed_with = "yara_analysis"
+def prepare_yara_analysis_output(sha256):
+    computed_with = "yara"
     try:
-        yara_analysis_output = report[9]["tool_results"]
+        yara_analysis_output = get_tool_analysis(sha256, computed_with)
 
         yara_matches = {"matches": yara_analysis_output["matches"]}
 
@@ -140,11 +150,11 @@ def prepare_yara_analysis_output(report):
         return {}, computed_with
 
 
-def prepare_threat_intelligence_output(report):
-    sample_timeline = prepare_sample_timeline_output(report)
-    virustotal = prepare_virustotal_output(report)
-    malwarebazaar = prepare_malwarebazaar_output(report)
-    yara_analysis = prepare_yara_analysis_output(report)
+def prepare_threat_intelligence_output(sha256):
+    sample_timeline = prepare_sample_timeline_output(sha256)
+    virustotal = prepare_virustotal_output(sha256)
+    malwarebazaar = prepare_malwarebazaar_output(sha256)
+    yara_analysis = prepare_yara_analysis_output(sha256)
 
     threat_intelligence = {
         f"sample_timeline[{sample_timeline[1]}]": sample_timeline[0],
@@ -162,11 +172,11 @@ def prepare_threat_intelligence_output(report):
 ################################################# APPLICATION ANALYSIS  #################################################
 
 
-def prepare_apk_details_output(report):
+def prepare_apk_details_output(sha256):
     computed_with = ["mobsf", "apk_info"]
     try:
-        mobsf_output = report[1]["tool_results"]
-        apk_info = report[8]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
+        apk_info = get_tool_analysis(sha256, computed_with[1])
         frosting_info = apk_info["frosting_info"]
         google_play_info = apk_info["google_play_info"]
         sign = google_play_info["sign"]
@@ -187,10 +197,10 @@ def prepare_apk_details_output(report):
         return {}, computed_with
 
 
-def prepare_certificate_details_output(report):
+def prepare_certificate_details_output(sha256):
     computed_with = "apk_info"
     try:
-        apk_info = report[8]["tool_results"]
+        apk_info = get_tool_analysis(sha256, computed_with)
         google_play_info = apk_info["google_play_info"]
         sign = google_play_info["sign"]
 
@@ -208,10 +218,10 @@ def prepare_certificate_details_output(report):
         return {}, computed_with
 
 
-def prepare_manifest_analysis_output(report):
+def prepare_manifest_analysis_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
 
         manifest_analysis = mobsf_output["manifest_analysis"]["manifest_findings"]
 
@@ -220,10 +230,10 @@ def prepare_manifest_analysis_output(report):
         return {}, computed_with
 
 
-def prepare_activities_output(report):
+def prepare_activities_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
 
         main_activity = {"main_activity": mobsf_output["main_activity"]}
 
@@ -239,10 +249,10 @@ def prepare_activities_output(report):
         return {}, computed_with
 
 
-def prepare_receivers_output(report):
+def prepare_receivers_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
 
         receivers = mobsf_output["receivers"]
 
@@ -251,10 +261,10 @@ def prepare_receivers_output(report):
         return {}, computed_with
 
 
-def prepare_services_output(report):
+def prepare_services_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
 
         services = mobsf_output["services"]
 
@@ -263,13 +273,13 @@ def prepare_services_output(report):
         return {}, computed_with
 
 
-def prepare_apk_analysis_output(report):
-    apk_details = prepare_apkid_output(report)
-    certificate_details = prepare_certificate_details_output(report)
-    manifest_analysis = prepare_manifest_analysis_output(report)
-    activities = prepare_activities_output(report)
-    receivers = prepare_receivers_output(report)
-    services = prepare_services_output(report)
+def prepare_apk_analysis_output(sha256):
+    apk_details = prepare_apk_details_output(sha256)
+    certificate_details = prepare_certificate_details_output(sha256)
+    manifest_analysis = prepare_manifest_analysis_output(sha256)
+    activities = prepare_activities_output(sha256)
+    receivers = prepare_receivers_output(sha256)
+    services = prepare_services_output(sha256)
 
     apk_analysis = {
         f"apk_details[{apk_details[1]}]": apk_details[0],
@@ -286,33 +296,31 @@ def prepare_apk_analysis_output(report):
 ################################################# CODE ANALYSIS  #################################################
 
 
-def prepare_niap_analysis_output(report):
+def prepare_niap_analysis_output(sha256):
+    computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
         niap_analysis = mobsf_output["niap_analysis"]
-
-        computed_with = "mobsf"
 
         return niap_analysis, computed_with
     except:
-        return {}
+        return {}, computed_with
 
 
-def prepare_code_vulnerabilities_output(report):
+def prepare_code_vulnerabilities_output(sha256):
+    computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
         code_analysis = mobsf_output["code_analysis"]["findings"]
-
-        computed_with = "mobsf"
 
         return code_analysis, computed_with
     except:
-        return {}
+        return {}, computed_with
 
 
-def prepare_code_analysis_output(report):
-    niap_analysis = prepare_niap_analysis_output(report)
-    code_vulnerabilities = prepare_code_vulnerabilities_output(report)
+def prepare_code_analysis_output(sha256):
+    niap_analysis = prepare_niap_analysis_output(sha256)
+    code_vulnerabilities = prepare_code_vulnerabilities_output(sha256)
 
     code_analysis = {
         f"niap_analysis[{niap_analysis[1]}]": niap_analysis[0],
@@ -325,10 +333,10 @@ def prepare_code_analysis_output(report):
 ################################################# BEHAVIOR ANALYSIS  #################################################
 
 
-def prepare_threat_analysis_output(report):
+def prepare_threat_analysis_output(sha256):
     computed_with = "quark_engine"
     try:
-        quark_engine_output = report[3]["tool_results"]
+        quark_engine_output = get_tool_analysis(sha256, computed_with)
         crimes = quark_engine_output["crimes"]
 
         threats = []
@@ -345,10 +353,10 @@ def prepare_threat_analysis_output(report):
         return {}, computed_with
 
 
-def prepare_permission_analysis_output(report):
+def prepare_permission_analysis_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
         permission_analysis = mobsf_output["permissions"]
 
         return permission_analysis, computed_with
@@ -356,10 +364,10 @@ def prepare_permission_analysis_output(report):
         return {}, computed_with
 
 
-def prepare_detailed_permissions_analysis_output(report):
+def prepare_detailed_permissions_analysis_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
         detailed_permissions = mobsf_output["android_api"]
 
         return detailed_permissions, computed_with
@@ -367,10 +375,10 @@ def prepare_detailed_permissions_analysis_output(report):
         return {}, computed_with
 
 
-def prepare_behavior_analysis_output(report):
-    threat_analysis = prepare_threat_analysis_output(report)
-    permission_analysis = prepare_permission_analysis_output(report)
-    detailed_permissions_analysis = prepare_detailed_permissions_analysis_output(report)
+def prepare_behavior_analysis_output(sha256):
+    threat_analysis = prepare_threat_analysis_output(sha256)
+    permission_analysis = prepare_permission_analysis_output(sha256)
+    detailed_permissions_analysis = prepare_detailed_permissions_analysis_output(sha256)
 
     behavior_analysis = {
         f"threats[{threat_analysis[1]}]": threat_analysis[0],
@@ -386,10 +394,10 @@ def prepare_behavior_analysis_output(report):
 ################################################# NETWORK ANALYSIS  #################################################
 
 
-def prepare_domain_analysis_output(report):
+def prepare_domain_analysis_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
         domains = mobsf_output["domains"]
 
         return domains, computed_with
@@ -397,10 +405,10 @@ def prepare_domain_analysis_output(report):
         return {}, computed_with
 
 
-def prepare_url_analysis_output(report):
+def prepare_url_analysis_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
         urls = mobsf_output["urls"]
 
         return urls, computed_with
@@ -408,9 +416,9 @@ def prepare_url_analysis_output(report):
         return {}, computed_with
 
 
-def prepare_network_analysis_output(report):
-    domains = prepare_domain_analysis_output(report)
-    urls = prepare_url_analysis_output(report)
+def prepare_network_analysis_output(sha256):
+    domains = prepare_domain_analysis_output(sha256)
+    urls = prepare_url_analysis_output(sha256)
 
     network_analysis = {
         f"domains[{domains[1]}]": domains[0],
@@ -423,13 +431,13 @@ def prepare_network_analysis_output(report):
 ################################################# FULL REPORT  #################################################
 
 
-def prepare_report_output(report):
-    fingerprints = prepare_fingerprints_output(report)
-    threat_intelligence = prepare_threat_intelligence_output(report)
-    apk_analysis = prepare_apk_analysis_output(report)
-    code_analysis = prepare_code_analysis_output(report)
-    behavior_analysis = prepare_behavior_analysis_output(report)
-    network_analysis = prepare_network_analysis_output(report)
+def prepare_report_output(sha256):
+    fingerprints = prepare_fingerprints_output(sha256)
+    threat_intelligence = prepare_threat_intelligence_output(sha256)
+    apk_analysis = prepare_apk_analysis_output(sha256)
+    code_analysis = prepare_code_analysis_output(sha256)
+    behavior_analysis = prepare_behavior_analysis_output(sha256)
+    network_analysis = prepare_network_analysis_output(sha256)
 
     report = {
         "fingerprints": fingerprints,
@@ -458,9 +466,7 @@ async def get_reports():
 # GET full Report
 @app.get("/api/report/{id}/")
 async def get_report(id):
-    report = load_report(id)
-
-    data = prepare_report_output(report)
+    data = prepare_report_output(id)
 
     return data
 
@@ -489,7 +495,7 @@ async def get_checksums(id):
 # GET identifiers
 @app.get("/api/report/{id}/fingerprints/identifiers/")
 async def get_identifiers(id):
-    output, computed_with = prepare_apk_analysis_output(id)
+    output, computed_with = prepare_apkid_output(id)
 
     data = {f"identifiers[{computed_with}]": [output]}
 
@@ -499,9 +505,9 @@ async def get_identifiers(id):
 # GET fuzzy hashes
 @app.get("/api/report/{id}/fingerprints/fuzzy-hashes/")
 async def get_fuzzy_hashes(id):
-    output, computed_with = prepare_ssdeep_output(id)
+    output, computed_with = prepare_fuzzy_hash_output(id)
 
-    data = {f"fuzzy-hashes[{computed_with}]": [output]}
+    data = {f"fuzzy-hashes[{computed_with}]": output}
 
     return data
 
@@ -512,9 +518,7 @@ async def get_fuzzy_hashes(id):
 # GET threat intelligence
 @app.get("/api/report/{id}/threat-intelligence/")
 async def get_threat_intelligence(id):
-    report = load_report(id)
-
-    data = prepare_threat_intelligence_output(report)
+    data = prepare_threat_intelligence_output(id)
 
     return data
 
@@ -522,9 +526,7 @@ async def get_threat_intelligence(id):
 # GET sample timeline
 @app.get("/api/report/{id}/threat-intelligence/timeline/")
 async def get_sample_timeline(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_sample_timeline_output(report)
+    output, computed_with = prepare_sample_timeline_output(id)
     data = {f"sample_timeline[{computed_with}]": output}
 
     return data
@@ -533,9 +535,7 @@ async def get_sample_timeline(id):
 # GET yara matches
 @app.get("/api/report/{id}/threat-intelligence/yara/")
 async def get_yara_analysis(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_yara_analysis_output(report)
+    output, computed_with = prepare_yara_analysis_output(id)
 
     data = {f"yara_matches[{computed_with}]": output}
 
@@ -545,8 +545,6 @@ async def get_yara_analysis(id):
 # GET antivirus detections
 @app.get("/api/report/{id}/threat-intelligence/av-detections/")
 async def get_antivirus_detections(id):
-    report = load_report(id)
-
     data = {}
     json_data = json.dumps(data)
 
@@ -556,10 +554,8 @@ async def get_antivirus_detections(id):
 # GET third party apps
 @app.get("/api/report/{id}/threat-intelligence/third-party-apps/")
 async def get_third_party_apps(id):
-    report = load_report(id)
-
-    virustotal_output = prepare_virustotal_output(report)
-    malwarebazaar_output = prepare_malwarebazaar_output(report)
+    virustotal_output = prepare_virustotal_output(id)
+    malwarebazaar_output = prepare_malwarebazaar_output(id)
     data = {
         "third-party-apps": {
             f"virustotal[{virustotal_output[1]}]": virustotal_output[0],
@@ -617,9 +613,7 @@ async def get_app_manifests(id):
 # GET app activities
 @app.get("/api/report/{id}/app/activities/")
 async def get_app_activities(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_activities_output(report)
+    output, computed_with = prepare_activities_output(id)
     data = {
         f"activities[{computed_with}]": output,
     }
@@ -630,9 +624,7 @@ async def get_app_activities(id):
 # GET app receiver
 @app.get("/api/report/{id}/app/receivers/")
 async def get_app_receivers(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_receivers_output(report)
+    output, computed_with = prepare_receivers_output(id)
     data = {
         f"receivers[{computed_with}]": output,
     }
@@ -643,9 +635,7 @@ async def get_app_receivers(id):
 # GET app services
 @app.get("/api/report/{id}/app/services/")
 async def get_app_services(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_services_output(report)
+    output, computed_with = prepare_services_output(id)
     data = {
         f"services[{computed_with}]": output,
     }
@@ -659,9 +649,7 @@ async def get_app_services(id):
 # GET code analysis
 @app.get("/api/report/{id}/code/")
 async def get_code_analysis(id):
-    report = load_report(id)
-
-    data = prepare_code_analysis_output(report)
+    data = prepare_code_analysis_output(id)
 
     return data
 
@@ -669,9 +657,7 @@ async def get_code_analysis(id):
 # GET NIAP analysis
 @app.get("/api/report/{id}/code/niap/")
 async def get_niap_analysis(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_niap_analysis_output(report)
+    output, computed_with = prepare_niap_analysis_output(id)
     data = {f"niap_analysis[{computed_with}]": output}
 
     return data
@@ -680,9 +666,7 @@ async def get_niap_analysis(id):
 # GET code vulnerabilities
 @app.get("/api/report/{id}/code/vulnerabilities/")
 async def get_code_vulnerabilities(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_code_vulnerabilities_output(report)
+    output, computed_with = prepare_code_vulnerabilities_output(id)
     data = {f"code_vulnerabilities[{computed_with}]": output}
 
     return data
@@ -694,9 +678,7 @@ async def get_code_vulnerabilities(id):
 # GET behavior analysis
 @app.get("/api/report/{id}/behavior/")
 async def get_behavior_analysis(id):
-    report = load_report(id)
-
-    data = prepare_behavior_analysis_output(report)
+    data = prepare_behavior_analysis_output(id)
 
     return data
 
@@ -704,9 +686,7 @@ async def get_behavior_analysis(id):
 # GET threat analysis
 @app.get("/api/report/{id}/behavior/threats/")
 async def get_threats_analysis(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_threat_analysis_output(report)
+    output, computed_with = prepare_threat_analysis_output(id)
     data = {f"threats[{computed_with}]": output}
 
     return data
@@ -715,10 +695,8 @@ async def get_threats_analysis(id):
 # GET permission analysis
 @app.get("/api/report/{id}/behavior/permissions/")
 async def get_permission_analysis(id):
-    report = load_report(id)
-
-    o, computed_with = prepare_permission_analysis_output(report)
-    data = {f"permissions[{computed_with}]": o}
+    output, computed_with = prepare_permission_analysis_output(id)
+    data = {f"permissions[{computed_with}]": output}
 
     return data
 
@@ -726,9 +704,7 @@ async def get_permission_analysis(id):
 # GET detailed permission analysis
 @app.get("/api/report/{id}/behavior/detailed-permissions/")
 async def get_detailed_permissions(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_detailed_permissions_analysis_output(report)
+    output, computed_with = prepare_detailed_permissions_analysis_output(id)
     data = {f"detailed_permissions[{computed_with}]": output}
 
     return data
@@ -739,7 +715,6 @@ async def get_detailed_permissions(id):
 
 @app.get("/api/report/{id}/control-flow/")
 async def get_control_flow(id):
-    report = load_report(id)
     output = json.dumps({})
     return output
 
@@ -750,9 +725,7 @@ async def get_control_flow(id):
 # GET network analysis
 @app.get("/api/report/{id}/network/")
 async def get_network_analysis(id):
-    report = load_report(id)
-
-    data = prepare_network_analysis_output(report)
+    data = prepare_network_analysis_output(id)
 
     return data
 
@@ -760,9 +733,7 @@ async def get_network_analysis(id):
 # GET domain analysis
 @app.get("/api/report/{id}/network/domains/")
 async def get_domain_analysis(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_domain_analysis_output(report)
+    output, computed_with = prepare_domain_analysis_output(id)
     data = {f"domains[{computed_with}]": output}
 
     return data
@@ -771,9 +742,7 @@ async def get_domain_analysis(id):
 # GET URL analysis
 @app.get("/api/report/{id}/network/urls/")
 async def get_url_analysis(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_url_analysis_output(report)
+    output, computed_with = prepare_url_analysis_output(id)
     data = {f"urls[{computed_with}]": output}
 
     return data
