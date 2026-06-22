@@ -1,14 +1,17 @@
 import asyncio
 import json
 import shutil
+from collections.abc import AsyncIterable
 from datetime import datetime
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from awesome_analysis_engine import analyze
 from mongodb_handler import (
+    get_analysis_status,
     get_apk_analysis_upload_timestamp,
     get_fuzzy_hash_analysis,
     get_tool_analysis,
@@ -481,7 +484,6 @@ async def analyze_apk(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
 
     sha256 = hash_file(path)
-
     asyncio.create_task(analyze(path))
 
     return {"status": "success", "id": sha256}
@@ -494,11 +496,14 @@ async def get_reports():
 
 
 # GET full Report
-@app.get("/api/report/{id}/")
-async def get_report(id):
+@app.get("/api/report/{id}/", response_class=EventSourceResponse)
+async def get_report(id) -> AsyncIterable[ServerSentEvent]:
     data = prepare_report_output(id)
 
-    return data
+    while get_analysis_status(id) == "pending":
+        yield ServerSentEvent(raw_data=json.dumps(data))
+        await asyncio.sleep(5)
+    yield ServerSentEvent(raw_data=json.dumps(data))
 
 
 ##########################################################################

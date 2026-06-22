@@ -27,8 +27,14 @@ def create_apk_analysis(path):
         sha256 = hash_file(path)
         uploaded_at = str(datetime.now())
         _get_apk_analysis_collection().create_index("sha256", unique=True)
-        apk_analysis = {"sha256": sha256, "uploaded_at": uploaded_at}
+        apk_analysis = {
+            "sha256": sha256,
+            "uploaded_at": uploaded_at,
+            "status": "pending",
+        }
         _get_apk_analysis_collection().insert_one(apk_analysis)
+
+        return sha256
     except:
         pass
 
@@ -72,3 +78,13 @@ def get_apk_analysis_upload_timestamp(sha256):
     return (
         _get_apk_analysis_collection().find_one({"sha256": sha256}).get("uploaded_at")
     )
+
+
+def set_analysis_status(sha256, status):
+    _get_apk_analysis_collection().update_one(
+        {"sha256": sha256}, {"$set": {"status": status}}
+    )
+
+
+def get_analysis_status(sha256):
+    return _get_apk_analysis_collection().find_one({"sha256": sha256}).get("status")
