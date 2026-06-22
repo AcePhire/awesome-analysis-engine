@@ -1,16 +1,20 @@
+import asyncio
 import json
-from calendar import c
+import shutil
 from datetime import datetime
 
-from fastapi import FastAPI
-from requests.api import get
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
+from awesome_analysis_engine import analyze
 from mongodb_handler import (
     get_apk_analysis_upload_timestamp,
     get_fuzzy_hash_analysis,
     get_tool_analysis,
     list_apk_analyses,
 )
+from utils import hash_file
 
 
 def load_report(id):
@@ -43,7 +47,6 @@ def prepare_apkid_output(sha256):
     computed_with = "apkid"
     try:
         apkid_output = get_tool_analysis(sha256, computed_with)
-        print(apkid_output)
         apkid = {"files": apkid_output}
 
         return apkid, computed_with
@@ -455,11 +458,38 @@ def prepare_report_output(sha256):
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# HOME
+@app.get("/")
+async def home():
+    return FileResponse("upload.html")
+
+
+# POST apk analysis
+@app.post("/api/analyze/")
+async def analyze_apk(file: UploadFile = File(...)):
+    path = f"apk_files/{file.filename}"
+
+    with open(path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    sha256 = hash_file(path)
+
+    asyncio.create_task(analyze(path))
+
+    return {"status": "success", "id": sha256}
+
 
 # GET all reports
 @app.get("/api/reports/")
 async def get_reports():
-    print(list_apk_analyses())
     return list_apk_analyses()
 
 

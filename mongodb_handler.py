@@ -1,8 +1,6 @@
 from datetime import datetime
-from enum import unique
 
 from pymongo import MongoClient
-from pymongo.operations import IndexModel
 
 from utils import hash_file
 

@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Upload</title>
+    </head>
+    <body>
+        <form id="uploadForm">
+            <input type="file" id="fileInput" required />
+            <button type="submit">Upload & Analyze</button>
+        </form>
+
+        <script>
+            document
+                .getElementById("uploadForm")
+                .addEventListener("submit", async (e) => {
+                    e.preventDefault();
+
+                    const fileInput = document.getElementById("fileInput");
+                    const formData = new FormData();
+                    formData.append("file", fileInput.files[0]);
+
+                    // Send the file to FastAPI
+                    const response = await fetch(
+                        "http://127.0.0.1:8000/api/analyze/",
+                        {
+                            method: "POST",
+                            body: formData,
+                        },
+                    );
+
+                    // Parse the JSON response
+                    const data = await response.json();
+
+                    // Redirect using the ID returned by FastAPI
+                    window.location.href = `http://127.0.0.1:8000/api/report/${data.id}/`;
+                });
+        </script>
+    </body>
+</html>

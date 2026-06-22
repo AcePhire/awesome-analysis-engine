@@ -1,3 +1,4 @@
 .env
+apk_files/
 reports/
 __pycache__/

@@ -96,8 +96,7 @@ def quark_engine_analysis(path):
         )
 
         data = json.loads(container.decode("utf-8"))
-    except Exception as e:
-        print(e)
+    except:
         data = "{}"
 
     print("quark_engine_analysis.........complete!")

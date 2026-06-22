@@ -1,6 +1,4 @@
 import asyncio
-import sys
-import timeit
 
 from mongodb_handler import add_fuzzy_hash, add_tool_analysis, create_apk_analysis
 from tools import *
@@ -34,12 +32,3 @@ async def analyze(path):
         run_analysis_tool(apk_info_analysis, "apk_info", path),
         run_analysis_tool(yara_analysis, "yara", path),
     )
-
-
-if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print("No path given!")
-        exit()
-
-    path = sys.argv[1]
-    asyncio.run(analyze(path))
