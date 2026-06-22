@@ -1,12 +1,14 @@
 import json
 from datetime import datetime
-from doctest import OutputChecker
-from pathlib import Path
-from tarfile import data_filter
+from webbrowser import get
 
 from fastapi import FastAPI
 
-from vt import virustotal
+from mongodb_handler import (
+    get_fuzzy_hash_analysis,
+    get_tool_analysis,
+    list_apk_analyses,
+)
 
 
 def load_report(id):
@@ -18,10 +20,10 @@ def load_report(id):
 ################################################# FINGERPRINTS  #################################################
 
 
-def prepare_checksums_output(report):
+def prepare_checksums_output(sha256):
     computed_with = "mobsf"
     try:
-        mobsf_output = report[1]["tool_results"]
+        mobsf_output = get_tool_analysis(sha256, computed_with)
 
         filesum = {
             "size": mobsf_output["size"],
@@ -35,10 +37,10 @@ def prepare_checksums_output(report):
         return {}, computed_with
 
 
-def prepare_apkid_output(report):
+def prepare_apkid_output(sha256):
     computed_with = "apkid"
     try:
-        apkid_output = report[2]["tool_results"]
+        apkid_output = get_tool_analysis(sha256, computed_with)
         apkid = {"files": apkid_output["files"]}
 
         return apkid, computed_with
@@ -46,26 +48,25 @@ def prepare_apkid_output(report):
         return {}, computed_with
 
 
-def prepare_ssdeep_output(report):
+def prepare_fuzzy_hash_output(sha256):
     computed_with = "ssdeep"
     try:
-        ssdeep_output = report[3]["tool_results"]
-        ssdeep = {"apk_file": ssdeep_output[0]["blocksize:hash:hash"]}
+        fuzzy_hashes = get_fuzzy_hash_analysis(sha256, computed_with)
 
-        return ssdeep, computed_with
+        return fuzzy_hashes, computed_with
     except:
         return {}, computed_with
 
 
-def prepare_fingerprints_output(report):
-    checksums = prepare_checksums_output(report)
-    apkid = prepare_apkid_output(report)
-    ssdeep = prepare_ssdeep_output(report)
+def prepare_fingerprints_output(sha256):
+    checksums = prepare_checksums_output(sha256)
+    apkid = prepare_apkid_output(sha256)
+    fuzzy_hashes = prepare_fuzzy_hash_output(sha256)
 
     fingerprints = {
         f"checksums[{checksums[1]}]": checksums[0],
         f"identifiers[{apkid[1]}]": {"apkid": apkid[0]},
-        f"fuzzy_hashes[{ssdeep[1]}]": {"ssdeep": ssdeep[0]},
+        f"fuzzy_hashes[{fuzzy_hashes[1]}]": fuzzy_hashes[0],
     }
 
     return fingerprints
@@ -450,8 +451,8 @@ app = FastAPI()
 # GET all reports
 @app.get("/api/reports/")
 async def get_reports():
-    files = [f.stem for f in Path("reports").iterdir() if f.is_file()]
-    return files
+    print(list_apk_analyses())
+    return list_apk_analyses()
 
 
 # GET full Report
@@ -470,9 +471,7 @@ async def get_report(id):
 # GET fingerprints
 @app.get("/api/report/{id}/fingerprints/")
 async def get_fingerprints(id):
-    report = load_report(id)
-
-    data = prepare_fingerprints_output(report)
+    data = prepare_fingerprints_output(id)
 
     return data
 
@@ -480,9 +479,7 @@ async def get_fingerprints(id):
 # GET checksums
 @app.get("/api/report/{id}/fingerprints/checksums/")
 async def get_checksums(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_checksums_output(report)
+    output, computed_with = prepare_checksums_output(id)
 
     data = {f"checksums[{computed_with}]": output}
 
@@ -492,9 +489,7 @@ async def get_checksums(id):
 # GET identifiers
 @app.get("/api/report/{id}/fingerprints/identifiers/")
 async def get_identifiers(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_apk_analysis_output(report)
+    output, computed_with = prepare_apk_analysis_output(id)
 
     data = {f"identifiers[{computed_with}]": [output]}
 
@@ -504,9 +499,7 @@ async def get_identifiers(id):
 # GET fuzzy hashes
 @app.get("/api/report/{id}/fingerprints/fuzzy-hashes/")
 async def get_fuzzy_hashes(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_ssdeep_output(report)
+    output, computed_with = prepare_ssdeep_output(id)
 
     data = {f"fuzzy-hashes[{computed_with}]": [output]}
 
@@ -583,9 +576,7 @@ async def get_third_party_apps(id):
 # GET app info
 @app.get("/api/report/{id}/app/")
 async def get_app_analysis(id):
-    report = load_report(id)
-
-    data = prepare_apk_analysis_output(report)
+    data = prepare_apk_analysis_output(id)
 
     return data
 
@@ -593,9 +584,7 @@ async def get_app_analysis(id):
 # GET app details
 @app.get("/api/report/{id}/app/details/")
 async def get_app_details(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_apk_details_output(report)
+    output, computed_with = prepare_apk_details_output(id)
     data = {
         f"apk_details[{computed_with}]": output,
     }
@@ -606,9 +595,7 @@ async def get_app_details(id):
 # GET app certificate
 @app.get("/api/report/{id}/app/certificate/")
 async def get_app_certificate(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_certificate_details_output(report)
+    output, computed_with = prepare_certificate_details_output(id)
     data = {
         f"certificate_details[{computed_with}]": output,
     }
@@ -619,9 +606,7 @@ async def get_app_certificate(id):
 # GET app manifests
 @app.get("/api/report/{id}/app/manifests/")
 async def get_app_manifests(id):
-    report = load_report(id)
-
-    output, computed_with = prepare_manifest_analysis_output(report)
+    output, computed_with = prepare_manifest_analysis_output(id)
     data = {
         f"manifest_analysis[{computed_with}]": output,
     }

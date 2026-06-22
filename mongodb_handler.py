@@ -57,3 +57,26 @@ def add_tool_analysis(sha256, tool_name, result):
     _get_apk_analysis_collection().update_one(
         {"sha256": sha256}, {"$set": {tool_name: result}}
     )
+<<<<<<< HEAD
+=======
+
+
+def add_fuzzy_hash(sha256, fuzzy_hash):
+    _get_apk_analysis_collection().update_one(
+        {"sha256": sha256}, {"$addToSet": {"fuzzy_hashes": fuzzy_hash}}
+    )
+
+
+def list_apk_analyses():
+    return _get_apk_analysis_collection().distinct("sha256")
+
+
+def get_tool_analysis(sha256, tool_name):
+    return _get_apk_analysis_collection().find_one({"sha256": sha256}).get(tool_name)
+
+
+def get_fuzzy_hash_analysis(sha256, tool_name):
+    return (
+        _get_apk_analysis_collection().find_one({"sha256": sha256}).get("fuzzy_hashes")
+    )
+>>>>>>> origin/mongo-x-api
