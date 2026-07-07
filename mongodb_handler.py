@@ -46,8 +46,12 @@ def add_fuzzy_hash(sha256, tool, filename, fuzzy_hash):
             "filename": filename,
             "fuzzy_hash": fuzzy_hash,
         }
+        _get_fuzzy_hashes_collection().create_index(
+            [("sha256", 1), ("tool", 1), ("filename", 1), ("fuzzy_hash", 1)],
+            unique=True,
+        )
         _get_fuzzy_hashes_collection().insert_one(fh)
-    except:
+    except Exception:
         pass
 
 

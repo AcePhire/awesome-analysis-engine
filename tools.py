@@ -1,5 +1,9 @@
 import json
 import os
+import shutil
+import zipfile
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import docker
 import requests
@@ -53,23 +57,41 @@ def apkid_analysis(path):
 
 # Analyze using ssdeep
 def ssdeep_analysis(path):
-    file, directory = resolve_path(path)
+    with TemporaryDirectory() as tmp_dir:
+        with zipfile.ZipFile(path, "r") as apk:
+            file_list = apk.namelist()
 
-    try:
-        container = client.containers.run(
-            "cincan/ssdeep",
-            volumes=[f"{directory}:/analysis:ro"],
-            command=f"/analysis/{file}",
-        )
+            for file in file_list:
+                try:
+                    if file.endswith(".dex"):
+                        apk.extract(file, tmp_dir)
+                except Exception:
+                    pass
 
-        csv_data = container.decode("utf-8").strip("ssdeep,1.1--")
-        data = json.loads(csv_to_json(csv_data))
-    except:
-        data = "{}"
+            try:
+                apk.extract("AndroidManifest.xml", tmp_dir)
+                apk.extract("resources.arsc", tmp_dir)
+            except Exception:
+                pass
+
+            shutil.copy(path, tmp_dir)
+
+        try:
+            container = client.containers.run(
+                "cincan/ssdeep",
+                volumes=[f"{Path(tmp_dir)}:/analysis:ro"],
+                working_dir="/analysis",
+                command=[f.name for f in Path(tmp_dir).iterdir()],
+            )
+
+            csv_data = container.decode("utf-8").strip("ssdeep,1.1--")
+            data = json.loads(csv_to_json(csv_data))
+        except Exception:
+            data = "{}"
 
     ssdeep_hashes = []
     for file in data:
-        filename = file["filename"]
+        filename = file["filename"].removeprefix("/analysis/")
         ssdeep_hash = file["blocksize:hash:hash"]
         ssdeep_hashes.append((filename, ssdeep_hash))
 
