@@ -38,4 +38,4 @@ async def analyze(path):
         run_analysis_tool(yara_analysis, "yara", path),
     )
 
-    await set_analysis_status(file_hash, "completed")
+    set_analysis_status(file_hash, "completed")

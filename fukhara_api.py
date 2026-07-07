@@ -6,13 +6,13 @@ from datetime import datetime
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from awesome_analysis_engine import analyze
 from mongodb_handler import (
     get_analysis_status,
-    get_apk_analysis_upload_timestamp,
+    get_analysis_upload_timestamp,
     get_fuzzy_hash_analysis,
     get_tool_analysis,
     list_apk_analyses,
@@ -92,7 +92,7 @@ def prepare_fingerprints_output(sha256):
 def prepare_sample_timeline_output(sha256):
     computed_with = ["fukhara", "virustotal"]
     try:
-        upload_timestamp = get_apk_analysis_upload_timestamp(sha256)
+        upload_timestamp = get_analysis_upload_timestamp(sha256)
         virustotal_output = get_tool_analysis(sha256, "virustotal")["data"][
             "attributes"
         ]

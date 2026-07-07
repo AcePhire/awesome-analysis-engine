@@ -1,7 +1,5 @@
 import json
 import os
-import timeit
-from datetime import datetime
 
 import docker
 import requests

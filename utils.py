@@ -43,9 +43,3 @@ def tag_results(tool, results):
         "tool": tool,
         "tool_results": results,
     }
-
-
-# Save report to a JSON file
-def saveReport(report, output_file):
-    with open(f"reports/{output_file}", "w") as file:
-        json.dump(report, file, indent=2)

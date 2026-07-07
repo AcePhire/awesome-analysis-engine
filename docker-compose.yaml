@@ -1,20 +1,13 @@
 version: "3"
 services:
-  postgres:
-    image: postgres
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_DB: fukhara
-      POSTGRES_PASSWORD: fukhara
-    ports:
-      - 5432:5432
   mongo:
     image: mongo
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: fukhara
       MONGO_INITDB_ROOT_PASSWORD: fukhara
+    networks:
+        - fukhara
     ports:
       - 27017:27017
   mongo-express:
@@ -26,28 +19,49 @@ services:
       ME_CONFIG_BASICAUTH_USERNAME: fukhara
       ME_CONFIG_BASICAUTH_PASSWORD: fukhara
       ME_CONFIG_MONGODB_URL: mongodb://fukhara:fukhara@mongo:27017/
+    networks:
+        - fukhara
     ports:
       - 8081:8081
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.2.4
     hostname: elasticsearch
     environment:
+      - node.name=elasticsearch
+      - cluster.name-es-docker-cluster
       - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
       - xpack.security.enabled=false
-      - xpack.security.transport.ssl.enabled=false
-      - ES_JAVA_OPTS=-Xms1000m -Xmx1000m
-      - ELASTIC_PASSWORD=fukhara
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - fukhara
     ports:
       - 9200:9200
       - 9300:9300
+  elastic-connector:
+    image: docker.elastic.co/integrations/elastic-connectors:9.2.4 
+    volumes:
+      - ./elastic-connectors:/config 
+    command:
+    - /app/bin/elastic-ingest
+    - -c 
+    - /config/config.yml
+    networks:
+     - fukhara
   kibana:
     image: docker.elastic.co/kibana/kibana:9.2.4
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=fukhara
-    depends_on:
-      - elasticsearch
+      - xpack.security.enabled=false
+#    volumes:
+#      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
+    networks:
+      - fukhara
     ports:
       - 5601:5601
   mobsf:
@@ -57,3 +71,9 @@ services:
       MOBSF_API_KEY: 515d3578262a2539cd13b5b9946fe17e350c321b91faeb1ee56095430242a4a9
     ports:
       - 8181:8000
+volumes:
+  opensearch_data:
+
+networks:
+  fukhara:
+    driver: bridge
