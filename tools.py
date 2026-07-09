@@ -30,7 +30,7 @@ def mobsf_analysis(path):
         hash = upload_file_to_mobsf(path)
         if hash:
             data = scan_file_in_mobsf(hash)
-    except:
+    except Exception:
         data = "{}"
 
     print("mobsf_analysis.........complete!")
@@ -48,7 +48,7 @@ def apkid_analysis(path):
             "rednaga:apkid", volumes=[f"{directory}:/input:ro"], command=f"-j {file}"
         )
         data = json.loads(container.decode("utf-8"))
-    except:
+    except Exception:
         data = "{}"
 
     print("apkid_analysis.........complete!")
@@ -116,7 +116,7 @@ def quark_engine_analysis(path):
         )
 
         data = json.loads(container.decode("utf-8"))
-    except:
+    except Exception:
         data = "{}"
 
     print("quark_engine_analysis.........complete!")
@@ -139,7 +139,7 @@ def androcfg_analysis(path):
         )
 
         data = json.loads(container.decode("utf-8"))
-    except:
+    except Exception:
         data = "{}"
 
     print("androcfg_analysis.........complete!")
@@ -157,7 +157,7 @@ def virustotal_analysis(path):
         response = requests.get(url, headers=headers)
 
         data = response.json()
-    except:
+    except Exception:
         data = "{}"
 
     print("virustotal_analysis.........complete!")
@@ -176,7 +176,7 @@ def malwarebazaar_analysis(path):
         response = requests.post(url, data=data_query, headers=headers)
 
         data = response.json()
-    except:
+    except Exception:
         data = "{}"
 
     print("malwarebazaar_analysis.........complete!")
@@ -195,7 +195,7 @@ def apk_info_analysis(path):
         )
 
         data = json.loads(container.decode("utf-8"))
-    except:
+    except Exception:
         data = "{}"
 
     print("apk_info_analysis.........complete!")
@@ -217,7 +217,7 @@ def yara_analysis(path):
         )
 
         data = json.loads(container.decode("utf-8"))
-    except:
+    except Exception:
         data = "{}"
 
     print("yara_analysis.........complete!")

@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from pymongo import MongoClient
-from pymongo.operations import IndexModel
 
 from utils import hash_file
 
@@ -19,7 +18,7 @@ def _get_apk_analysis_collection():
     return _get_db()["apk_analysis"]
 
 
-def _get_fuzzy_hashes_collection():
+def get_fuzzy_hashes_collection():
     return _get_db()["fuzzy_hashes"]
 
 
@@ -46,11 +45,11 @@ def add_fuzzy_hash(sha256, tool, filename, fuzzy_hash):
             "filename": filename,
             "fuzzy_hash": fuzzy_hash,
         }
-        _get_fuzzy_hashes_collection().create_index(
+        get_fuzzy_hashes_collection().create_index(
             [("sha256", 1), ("tool", 1), ("filename", 1), ("fuzzy_hash", 1)],
             unique=True,
         )
-        _get_fuzzy_hashes_collection().insert_one(fh)
+        get_fuzzy_hashes_collection().insert_one(fh)
     except Exception:
         pass
 

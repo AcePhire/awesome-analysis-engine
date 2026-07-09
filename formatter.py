@@ -22,7 +22,7 @@ def prepare_checksums_output(sha256):
         }
 
         return filesum, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -33,7 +33,7 @@ def prepare_apkid_output(sha256):
         apkid = {"files": apkid_output}
 
         return apkid, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -48,7 +48,7 @@ def prepare_fuzzy_hash_output(sha256):
             }
 
         return fuzzy_hashes, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -100,7 +100,7 @@ def prepare_sample_timeline_output(sha256):
         }
 
         return sample_timeline, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -110,7 +110,7 @@ def prepare_virustotal_output(sha256):
         virustotal_output = get_tool_analysis(sha256, computed_with)["data"]
 
         return virustotal_output, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -120,7 +120,7 @@ def prepare_malwarebazaar_output(sha256):
         malwarebazaar_output = get_tool_analysis(sha256, computed_with)["data"]
 
         return malwarebazaar_output, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -132,7 +132,7 @@ def prepare_yara_analysis_output(sha256):
         yara_matches = {"matches": yara_analysis_output["matches"]}
 
         return yara_matches, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -179,7 +179,7 @@ def prepare_apk_details_output(sha256):
         }
 
         return apk_details, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -200,7 +200,7 @@ def prepare_certificate_details_output(sha256):
         }
 
         return certificate_details, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -212,7 +212,7 @@ def prepare_manifest_analysis_output(sha256):
         manifest_analysis = mobsf_output["manifest_analysis"]["manifest_findings"]
 
         return manifest_analysis, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -231,7 +231,7 @@ def prepare_activities_output(sha256):
         }
 
         return activities, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -243,7 +243,7 @@ def prepare_receivers_output(sha256):
         receivers = mobsf_output["receivers"]
 
         return receivers, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -255,7 +255,7 @@ def prepare_services_output(sha256):
         services = mobsf_output["services"]
 
         return services, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -289,7 +289,7 @@ def prepare_niap_analysis_output(sha256):
         niap_analysis = mobsf_output["niap_analysis"]
 
         return niap_analysis, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -300,7 +300,7 @@ def prepare_code_vulnerabilities_output(sha256):
         code_analysis = mobsf_output["code_analysis"]["findings"]
 
         return code_analysis, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -335,7 +335,7 @@ def prepare_threat_analysis_output(sha256):
         threat_analysis = threats
 
         return threat_analysis, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -346,7 +346,7 @@ def prepare_permission_analysis_output(sha256):
         permission_analysis = mobsf_output["permissions"]
 
         return permission_analysis, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -357,7 +357,7 @@ def prepare_detailed_permissions_analysis_output(sha256):
         detailed_permissions = mobsf_output["android_api"]
 
         return detailed_permissions, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -387,7 +387,7 @@ def prepare_domain_analysis_output(sha256):
         domains = mobsf_output["domains"]
 
         return domains, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 
@@ -398,7 +398,7 @@ def prepare_url_analysis_output(sha256):
         urls = mobsf_output["urls"]
 
         return urls, computed_with
-    except:
+    except Exception:
         return {}, computed_with
 
 

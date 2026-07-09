@@ -3,14 +3,14 @@ import sys
 
 import ssdeep
 
-from mongodb_handler import _get_fuzzy_hashes_collection
+from mongodb_handler import get_fuzzy_hashes_collection
 
 
 def hash_compare(sha256):
     source_hashes = list(
-        _get_fuzzy_hashes_collection().find({"tool": "ssdeep", "sha256": sha256})
+        get_fuzzy_hashes_collection().find({"tool": "ssdeep", "sha256": sha256})
     )
-    target_hashes = list(_get_fuzzy_hashes_collection().find({"tool": "ssdeep"}))
+    target_hashes = list(get_fuzzy_hashes_collection().find({"tool": "ssdeep"}))
 
     results = []
     for source_hash in source_hashes:

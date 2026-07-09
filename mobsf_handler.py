@@ -40,7 +40,7 @@ def upload_file_to_mobsf(path):
         response = requests.post(url, data=multipart_data, headers=headers)
 
         return response.json()["hash"]
-    except:
+    except Exception:
         return hash_file(path)
 
 
@@ -54,5 +54,5 @@ def scan_file_in_mobsf(hash):
         response = requests.post(url, data=data, headers=headers)
 
         return response.json()
-    except:
+    except Exception:
         print("Couldn't scan file!")

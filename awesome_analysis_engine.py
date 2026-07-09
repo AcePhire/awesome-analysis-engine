@@ -7,6 +7,7 @@ from mongodb_handler import (
     set_analysis_status,
 )
 from tools import *
+from utils import hash_file
 
 
 async def run_analysis_tool(analysis_func, name, path):
