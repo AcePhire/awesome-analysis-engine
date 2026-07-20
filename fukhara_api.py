@@ -9,8 +9,9 @@ from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic_core.core_schema import TaggedUnionSchema
 
+from api_formatter import *
 from awesome_analysis_engine import analyze
-from formatter import *
+from docs.api import *
 from mongodb_handler import (
     get_analysis_status,
     list_apk_analyses,
@@ -33,6 +34,10 @@ tags_metadata = [
     {
         "name": "Analyze",
         "description": "Submit an APK sample for analysis.",
+    },
+    {
+        "name": "Verdict",
+        "description": "Retrieve the final verdict over the sample"
     },
     {
         "name": "Fingerprints",
@@ -86,10 +91,12 @@ async def home():
     summary="Submit an APK for analysis",
     description="Upload an APK file, computes its SHA-256 hash, and queues it for analysis. Return the SHA-256 hash of the APK file",
     tags=["Analyze"],
+    response_model=AnalyzeResponse,
 )
 async def analyze_apk(
     file: Annotated[UploadFile, File(description="APK file to analyze")],
 ):
+    # Path("apk_files").mkdir(exist_ok=True)
     path = f"apk_files/{file.filename}"
 
     with open(path, "wb") as buffer:
@@ -133,6 +140,7 @@ async def get_reports():
     summary="Get the full analysis report",
     description="Return the complete, aggregated analysis report (fingerprints, threat intelligence, app information, code analysis, behavior analysis, and network analysis)",
     tags=["Analysis Report"],
+    response_model=ReportResponse,
 )
 async def get_report(
     id: Annotated[
@@ -143,15 +151,31 @@ async def get_report(
 
     return data
 
-
 ##########################################################################
 
+@app.get("/api/report/{id}/verdict/",
+    summary="Get the sample's final verdict",
+    description="Return the final verdict(malicious or not, severity, reason, response needed",
+    tags=["Verdict"],
+    response_model=VerdictSectionResponse,
+)
+async def get_verdict(
+    id: Annotated[
+        str, Path(description="Analysis report ID (SHA256 checksum of the APK file")
+    ]
+):
+    data = {"verdict": prepare_verdict_output(id)}
+
+    return data
+
+##########################################################################
 
 @app.get(
     "/api/report/{id}/fingerprints/",
     summary="Get fingerprints data",
     description="Return all the fingerprints data (checksums, identifiers, fuzzy hashes)",
     tags=["Fingerprints"],
+    response_model=FingerprintsResponse,
 )
 async def get_fingerprints(
     id: Annotated[
@@ -168,15 +192,14 @@ async def get_fingerprints(
     summary="Get file checksums",
     description="Return file checksums (e.g. MD5, SHA256) computed",
     tags=["Fingerprints"],
+    response_model=ChecksumSectionResponse,
 )
 async def get_checksums(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_checksums_output(id)
-
-    data = {f"checksums[{computed_with}]": output}
+    data = {"checksums": prepare_checksums_output(id)}
 
     return data
 
@@ -186,15 +209,15 @@ async def get_checksums(
     summary="Get APK identifiers",
     description="Return packer/obfuscator/compiler identifiers",
     tags=["Fingerprints"],
+    response_model=IdentifiersSectionResponse,
 )
 async def get_identifiers(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_apkid_output(id)
 
-    data = {f"identifiers[{computed_with}]": [output]}
+    data = {"identifiers": prepare_identifers_output(id)}
 
     return data
 
@@ -204,15 +227,14 @@ async def get_identifiers(
     summary="Get fuzzy hashes",
     description="Return fuzzy hash values (e.g. ssdeep) used for similarity comparisons",
     tags=["Fingerprints"],
+    response_model=FuzzyHashesSectionResponse,
 )
 async def get_fuzzy_hashes(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_fuzzy_hash_output(id)
-
-    data = {f"fuzzy-hashes[{computed_with}]": output}
+    data = {f"fuzzy-hashes": prepare_fuzzy_hash_output(id)}
 
     return data
 
@@ -225,6 +247,7 @@ async def get_fuzzy_hashes(
     summary="Get all threat intelligence data",
     description="Return all the threat intelligence data (sample timeline, YARA matches, antivirus detections, third-party lookups)",
     tags=["Threat Intelligence"],
+    response_model=ThreatIntelligenceResponse,
 )
 async def get_threat_intelligence(
     id: Annotated[
@@ -241,14 +264,14 @@ async def get_threat_intelligence(
     summary="Get sample timeline",
     description="Return key dates for the sample (file creation, certficate validaity, first/last submission)",
     tags=["Threat Intelligence"],
+    response_model=TimelineSectionResponse,
 )
 async def get_sample_timeline(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_sample_timeline_output(id)
-    data = {f"sample_timeline[{computed_with}]": output}
+    data = {"sample_timeline": prepare_sample_timeline_output(id)}
 
     return data
 
@@ -258,34 +281,33 @@ async def get_sample_timeline(
     summary="Get YARA rule matches",
     description="Return the YARA rule match results",
     tags=["Threat Intelligence"],
+    response_model=YaraSectionResponse,
 )
 async def get_yara_analysis(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_yara_analysis_output(id)
-
-    data = {f"yara_matches[{computed_with}]": output}
+    data = {"yara_matches": prepare_yara_analysis_output(id)}
 
     return data
 
 
 @app.get(
-    "/api/report/{id}/threat-intelligence/av-detections/",
-    summary="Get antivirus detections",
-    description="Return the antivirus engine detections",
+    "/api/report/{id}/threat-intelligence/popular-av-detections/",
+    summary="Get popular antivirus detections",
+    description="Return the popular antivirus engine detections",
     tags=["Threat Intelligence"],
+    response_model=AVDetectionsSectionResponse,
 )
 async def get_antivirus_detections(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    data = {}
-    json_data = json.dumps(data)
+    data = {"popular_av_detections": prepare_popular_av_detections_output(id)}
 
-    return json_data
+    return data
 
 
 @app.get(
@@ -293,20 +315,14 @@ async def get_antivirus_detections(
     summary="Get 3rd-party lookup results",
     description="Return lookup results for 3rd-party threat intelligence sources (e.g. VirusTotal, MalwareBazaar)",
     tags=["Threat Intelligence"],
+    response_model=ThirdPartySectionResponse,
 )
 async def get_third_party_apps(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    virustotal_output = prepare_virustotal_output(id)
-    malwarebazaar_output = prepare_malwarebazaar_output(id)
-    data = {
-        "third-party-apps": {
-            f"virustotal[{virustotal_output[1]}]": virustotal_output[0],
-            f"malwarebazaar[{malwarebazaar_output[1]}]": malwarebazaar_output[0],
-        }
-    }
+    data = {"third-party-apps": prepare_third_party_apps_output(id)}
 
     return data
 
@@ -319,6 +335,7 @@ async def get_third_party_apps(
     summary="Get all app information",
     description="Return the full app information (details, certificates, manifests, activities, receivers, services)",
     tags=["App Info"],
+    response_model=AppAnalysisResponse,
 )
 async def get_app_analysis(
     id: Annotated[
@@ -335,16 +352,14 @@ async def get_app_analysis(
     summary="Get app details",
     description="Return basic app metadata (package name, version, size, etc. ",
     tags=["App Info"],
+    response_model=APKDetailsSectionResponse,
 )
 async def get_app_details(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_apk_details_output(id)
-    data = {
-        f"apk_details[{computed_with}]": output,
-    }
+    data = {"apk_details": prepare_apk_details_output(id)}
 
     return data
 
@@ -354,16 +369,14 @@ async def get_app_details(
     summary="Get signing certificate details",
     description="Return the APK's signing certificate details (issuer, subject, validity, etc.)",
     tags=["App Info"],
+    response_model=CertificateSectionResponse,
 )
 async def get_app_certificate(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_certificate_details_output(id)
-    data = {
-        f"certificate_details[{computed_with}]": output,
-    }
+    data = {"certificate_details": prepare_certificate_details_output(id)}
 
     return data
 
@@ -373,16 +386,14 @@ async def get_app_certificate(
     summary="Get app manifests",
     description="Return a list of manifests declared in the app's manifest files (AndroidManifest.xml, etc.)",
     tags=["App Info"],
+    response_model=ManifestSectionResponse,
 )
 async def get_app_manifests(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_manifest_analysis_output(id)
-    data = {
-        f"manifest_analysis[{computed_with}]": output,
-    }
+    data = {"manifest_analysis": prepare_manifest_analysis_output(id)}
 
     return data
 
@@ -392,16 +403,14 @@ async def get_app_manifests(
     summary="Get app activities",
     description="Return a list of activities declared in the app's manifest files (AndroidManifest.xml, etc. )",
     tags=["App Info"],
+    response_model=ActivitiesSectionResponse,
 )
 async def get_app_activities(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_activities_output(id)
-    data = {
-        f"activities[{computed_with}]": output,
-    }
+    data = {"activities": prepare_activities_output(id)}
 
     return data
 
@@ -411,16 +420,14 @@ async def get_app_activities(
     summary="Get app receivers",
     description="Return a list of receivers declared in the app's manifest files (AndroidManifest.xml, etc.)",
     tags=["App Info"],
+    response_model=ReceiversSectionResponse,
 )
 async def get_app_receivers(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_receivers_output(id)
-    data = {
-        f"receivers[{computed_with}]": output,
-    }
+    data = {"receivers": prepare_receivers_output(id)}
 
     return data
 
@@ -430,16 +437,14 @@ async def get_app_receivers(
     summary="Get app services",
     description="Return a list of services declared in the app's manifest files (AndroidManifest.xml, etc.)",
     tags=["App Info"],
+    response_model=ServicesSectionResponse,
 )
 async def get_app_services(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_services_output(id)
-    data = {
-        f"services[{computed_with}]": output,
-    }
+    data = {"services": prepare_services_output(id)}
 
     return data
 
@@ -452,6 +457,7 @@ async def get_app_services(
     summary="Get all code analysis results",
     description="Return the full code analysis results (NIAP compliance, vulnerabilities)",
     tags=["Code Analysis"],
+    response_model=CodeAnalysisResponse,
 )
 async def get_code_analysis(
     id: Annotated[
@@ -468,14 +474,14 @@ async def get_code_analysis(
     summary="Get NIAP analysis",
     description="Return the NIAP (National Information Assurance Program) compliance analysis results",
     tags=["Code Analysis"],
+    response_model=NiapSectionResponse,
 )
 async def get_niap_analysis(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_niap_analysis_output(id)
-    data = {f"niap_analysis[{computed_with}]": output}
+    data = {"niap_analysis": prepare_niap_analysis_output(id)}
 
     return data
 
@@ -485,14 +491,14 @@ async def get_niap_analysis(
     summary="Get code vulnerabilities",
     description="Return a list of vulnerabilities detected via static analysis of the code",
     tags=["Code Analysis"],
+    response_model=CodeVulnerabilitiesSectionResponse,
 )
 async def get_code_vulnerabilities(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_code_vulnerabilities_output(id)
-    data = {f"code_vulnerabilities[{computed_with}]": output}
+    data = {"code_vulnerabilities": prepare_code_vulnerabilities_output(id)}
 
     return data
 
@@ -505,6 +511,7 @@ async def get_code_vulnerabilities(
     summary="Get all behavior analysis results",
     description="Return the full behavior analysis results (threats, permissions, detailed permissions)",
     tags=["Behavior Analysis"],
+    response_model=BehaviorAnalysisResponse,
 )
 async def get_behavior_analysis(
     id: Annotated[
@@ -521,14 +528,14 @@ async def get_behavior_analysis(
     summary="Get behavioral threats",
     description="Return a list of threats (crimes) detected",
     tags=["Behavior Analysis"],
+    response_model=ThreatsSectionResponse,
 )
 async def get_threats_analysis(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_threat_analysis_output(id)
-    data = {f"threats[{computed_with}]": output}
+    data = {"threats": prepare_threat_analysis_output(id)}
 
     return data
 
@@ -538,14 +545,14 @@ async def get_threats_analysis(
     summary="Get permissions analysis",
     description="Return a list of permissions requested by the APK",
     tags=["Behavior Analysis"],
+    response_model=PermissionsSectionResponse,
 )
 async def get_permission_analysis(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_permission_analysis_output(id)
-    data = {f"permissions[{computed_with}]": output}
+    data = {"permissions": prepare_permission_analysis_output(id)}
 
     return data
 
@@ -555,14 +562,14 @@ async def get_permission_analysis(
     summary="Get detailed permission analysis",
     description="Return a list of detailed permissions requested by the APK",
     tags=["Behavior Analysis"],
+    response_model=DetailedPermissionsSectionResponse,
 )
 async def get_detailed_permissions(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_detailed_permissions_analysis_output(id)
-    data = {f"detailed_permissions[{computed_with}]": output}
+    data = {"detailed_permissions": prepare_detailed_permissions_analysis_output(id)}
 
     return data
 
@@ -593,6 +600,7 @@ async def get_control_flow(
     summary="Get all network analysis",
     description="Return the network analysis results (domains and URLs)",
     tags=["Network Analysis"],
+    response_model=NetworkAnalysisResponse,
 )
 async def get_network_analysis(
     id: Annotated[
@@ -609,14 +617,14 @@ async def get_network_analysis(
     summary="Get network domains",
     description="Return a list of network domains accessed",
     tags=["Network Analysis"],
+    response_model=DomainsSectionResponse,
 )
 async def get_domain_analysis(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_domain_analysis_output(id)
-    data = {f"domains[{computed_with}]": output}
+    data = {"domains": prepare_domain_analysis_output(id)}
 
     return data
 
@@ -626,13 +634,13 @@ async def get_domain_analysis(
     summary="Get network URLs",
     description="Return a list of network URLs accessed",
     tags=["Network Analysis"],
+    response_model=UrlsSectionResponse,
 )
 async def get_url_analysis(
     id: Annotated[
         str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
     ],
 ):
-    output, computed_with = prepare_url_analysis_output(id)
-    data = {f"urls[{computed_with}]": output}
+    data = {"urls": prepare_url_analysis_output(id)}
 
     return data

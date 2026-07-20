@@ -5,36 +5,64 @@ from mongodb_handler import (
     get_fuzzy_hash_analysis,
     get_tool_analysis,
 )
+from tools import malwarebazaar_analysis
+
+
+def encapsulate(tool_output, computed_with):
+    output = {}
+    output["computed_with"] = computed_with
+    output["data"] = tool_output
+
+    return output
+
+################################################# VERDICT  #################################################
+
+def prepare_verdict_output(sha256):
+    computed_with = ["fukhara"]
+    try:
+        verdict = {
+            "verdict": "",
+            "severity": "",
+            "reason": "",
+            "response": ""
+        }
+    except Exception:
+        verdict = {}
+
+    return encapsulate(verdict, computed_with)
 
 ################################################# FINGERPRINTS  #################################################
 
 
 def prepare_checksums_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
 
-        filesum = {
+        checksums = {
             "size": mobsf_output["size"],
             "md5": mobsf_output["md5"],
             "sha1": mobsf_output["sha1"],
             "sha256": mobsf_output["sha256"],
         }
-
-        return filesum, computed_with
     except Exception:
-        return {}, computed_with
+        checksums = {}
+
+    return encapsulate(checksums, computed_with)
 
 
-def prepare_apkid_output(sha256):
-    computed_with = "apkid"
+def prepare_identifers_output(sha256):
+    computed_with = ["apkid"]
     try:
-        apkid_output = get_tool_analysis(sha256, computed_with)
+        apkid_output = get_tool_analysis(sha256, computed_with[0])
         apkid = {"files": apkid_output}
 
-        return apkid, computed_with
     except Exception:
-        return {}, computed_with
+        apkid = {}
+
+    identifiers = {"apkid": apkid}
+
+    return encapsulate(identifiers, computed_with)
 
 
 def prepare_fuzzy_hash_output(sha256):
@@ -43,24 +71,25 @@ def prepare_fuzzy_hash_output(sha256):
         fuzzy_hashes = {}
         for tool in computed_with:
             tool_output = get_fuzzy_hash_analysis(sha256, tool)
-            fuzzy_hashes[tool] = {
-                item["filename"]: item["fuzzy_hash"] for item in tool_output
-            }
-
-        return fuzzy_hashes, computed_with
+            fuzzy_hashes[tool] = [
+                {"filename": item["filename"], "fuzzy_hash": item["fuzzy_hash"]}
+                for item in tool_output
+            ]
     except Exception:
-        return {}, computed_with
+        fuzzy_hashes = {}
+
+    return encapsulate(fuzzy_hashes, computed_with)
 
 
 def prepare_fingerprints_output(sha256):
     checksums = prepare_checksums_output(sha256)
-    apkid = prepare_apkid_output(sha256)
+    identifers = prepare_identifers_output(sha256)
     fuzzy_hashes = prepare_fuzzy_hash_output(sha256)
 
     fingerprints = {
-        f"checksums[{checksums[1]}]": checksums[0],
-        f"identifiers[{apkid[1]}]": {"apkid": apkid[0]},
-        f"fuzzy_hashes[{fuzzy_hashes[1]}]": fuzzy_hashes[0],
+        "checksums": checksums,
+        "identifiers": identifers,
+        "fuzzy_hashes": fuzzy_hashes,
     }
 
     return fingerprints
@@ -73,7 +102,7 @@ def prepare_sample_timeline_output(sha256):
     computed_with = ["fukhara", "virustotal"]
     try:
         upload_timestamp = get_analysis_upload_timestamp(sha256)
-        virustotal_output = get_tool_analysis(sha256, "virustotal")["data"][
+        virustotal_output = get_tool_analysis(sha256, computed_with[1])["data"][
             "attributes"
         ]
 
@@ -99,57 +128,83 @@ def prepare_sample_timeline_output(sha256):
             ]["validto"],
         }
 
-        return sample_timeline, computed_with
     except Exception:
-        return {}, computed_with
+        sample_timeline = {}
+
+    return encapsulate(sample_timeline, computed_with)
 
 
-def prepare_virustotal_output(sha256):
-    computed_with = "virustotal"
+def prepare_third_party_apps_output(sha256):
+    computed_with = ["virustotal", "malwarebazaar"]
+
     try:
-        virustotal_output = get_tool_analysis(sha256, computed_with)["data"]
+        virustotal_output = get_tool_analysis(sha256, computed_with[0])["data"]
 
-        return virustotal_output, computed_with
+        virustotal_link = virustotal_output["links"]["self"]
     except Exception:
-        return {}, computed_with
+        virustotal_link = ""
 
-
-def prepare_malwarebazaar_output(sha256):
-    computed_with = "malwarebazaar"
     try:
-        malwarebazaar_output = get_tool_analysis(sha256, computed_with)["data"]
+        get_tool_analysis(sha256, computed_with[1])["data"][0]
 
-        return malwarebazaar_output, computed_with
+        malwarebazaar_link = "https://bazaar.abuse.ch/sample/" + sha256
     except Exception:
-        return {}, computed_with
+        malwarebazaar_link = ""
+
+    third_party_apps = {
+        "virustotal": virustotal_link,
+        "malwarebazaar": malwarebazaar_link,
+    }
+
+    return encapsulate(third_party_apps, computed_with)
+
+
+def prepare_popular_av_detections_output(sha256):
+    computed_with = ["virustotal"]
+
+    try:
+        virustotal_output = get_tool_analysis(sha256, computed_with[0])["data"]
+
+        av_detections = virustotal_output["attributes"][
+            "popular_threat_classification"
+        ]["popular_threat_name"]
+
+        popular_av_detections = []
+
+        for av in av_detections:
+            detection = {av["value"]: av["count"]}
+
+            popular_av_detections.append(detection)
+    except Exception:
+        popular_av_detections = {}
+
+    return encapsulate(popular_av_detections, computed_with)
 
 
 def prepare_yara_analysis_output(sha256):
-    computed_with = "yara"
+    computed_with = ["yara_analyzer"]
     try:
-        yara_analysis_output = get_tool_analysis(sha256, computed_with)
+        yara_analysis_output = get_tool_analysis(sha256, computed_with[0])
 
         yara_matches = {"matches": yara_analysis_output["matches"]}
 
-        return yara_matches, computed_with
     except Exception:
-        return {}, computed_with
+        yara_matches = {}
+
+    return encapsulate(yara_matches, computed_with)
 
 
 def prepare_threat_intelligence_output(sha256):
     sample_timeline = prepare_sample_timeline_output(sha256)
-    virustotal = prepare_virustotal_output(sha256)
-    malwarebazaar = prepare_malwarebazaar_output(sha256)
+    third_party_apps = prepare_third_party_apps_output(sha256)
+    popular_av_detections = prepare_popular_av_detections_output(sha256)
     yara_analysis = prepare_yara_analysis_output(sha256)
 
     threat_intelligence = {
-        f"sample_timeline[{sample_timeline[1]}]": sample_timeline[0],
-        f"yara_matches[{yara_analysis[1]}]": yara_analysis[0],
-        "av-detections": {},
-        "third-party-apps": {
-            f"virustotal[{virustotal[1]}]": virustotal[0],
-            f"malwarebazaar[{malwarebazaar[1]}]": malwarebazaar[0],
-        },
+        "sample_timeline": sample_timeline,
+        "yara_matches": yara_analysis,
+        "av-detections": popular_av_detections,
+        "third-party-apps": third_party_apps,
     }
 
     return threat_intelligence
@@ -178,15 +233,16 @@ def prepare_apk_details_output(sha256):
             "frosting": frosting_info,
         }
 
-        return apk_details, computed_with
     except Exception:
-        return {}, computed_with
+        apk_details = {}
+
+    return encapsulate(apk_details, computed_with)
 
 
 def prepare_certificate_details_output(sha256):
-    computed_with = "apk_info"
+    computed_with = ["apk_info"]
     try:
-        apk_info = get_tool_analysis(sha256, computed_with)
+        apk_info = get_tool_analysis(sha256, computed_with[0])
         google_play_info = apk_info["google_play_info"]
         sign = google_play_info["sign"]
 
@@ -199,64 +255,67 @@ def prepare_certificate_details_output(sha256):
             "not_after": sign["certificates"][0]["not_after"],
         }
 
-        return certificate_details, computed_with
     except Exception:
-        return {}, computed_with
+        certificate_details = {}
+
+    return encapsulate(certificate_details, computed_with)
 
 
 def prepare_manifest_analysis_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
 
         manifest_analysis = mobsf_output["manifest_analysis"]["manifest_findings"]
 
-        return manifest_analysis, computed_with
     except Exception:
-        return {}, computed_with
+        manifest_analysis = {}
+
+    return encapsulate(manifest_analysis, computed_with)
 
 
 def prepare_activities_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
 
-        main_activity = {"main_activity": mobsf_output["main_activity"]}
+        main_activity = mobsf_output["main_activity"]
 
-        all_activities = {"all_activities": mobsf_output["activities"]}
-
-        activities = {
-            "main_activity": main_activity,
-            "all_activities": all_activities,
-        }
-
-        return activities, computed_with
+        all_activities = mobsf_output["activities"]
     except Exception:
-        return {}, computed_with
+        main_activity = ""
+        all_activities = []
+
+    activities = {
+        "main_activity": main_activity,
+        "all_activities": all_activities,
+    }
+
+    return encapsulate(activities, computed_with)
 
 
 def prepare_receivers_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
 
         receivers = mobsf_output["receivers"]
-
-        return receivers, computed_with
     except Exception:
-        return {}, computed_with
+        receivers = []
+
+    return encapsulate(receivers, computed_with)
 
 
 def prepare_services_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
 
         services = mobsf_output["services"]
-
-        return services, computed_with
     except Exception:
-        return {}, computed_with
+        services = []
+
+    return encapsulate(services, computed_with)
 
 
 def prepare_apk_analysis_output(sha256):
@@ -268,12 +327,12 @@ def prepare_apk_analysis_output(sha256):
     services = prepare_services_output(sha256)
 
     apk_analysis = {
-        f"apk_details[{apk_details[1]}]": apk_details[0],
-        f"certificate_details[{certificate_details[1]}]": certificate_details[0],
-        f"manifest_analysis[{manifest_analysis[1]}]": manifest_analysis[0],
-        f"acitivities[{activities[1]}]": activities[0],
-        f"receivers[{receivers[1]}]": receivers[0],
-        f"services[{services[1]}]": services[0],
+        "apk_details": apk_details,
+        "certificate_details": certificate_details,
+        "manifest_analysis": manifest_analysis,
+        "acitivities": activities,
+        "receivers": receivers,
+        "services": services,
     }
 
     return apk_analysis
@@ -283,25 +342,25 @@ def prepare_apk_analysis_output(sha256):
 
 
 def prepare_niap_analysis_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
         niap_analysis = mobsf_output["niap_analysis"]
-
-        return niap_analysis, computed_with
     except Exception:
-        return {}, computed_with
+        niap_analysis = {}
+
+    return encapsulate(niap_analysis, computed_with)
 
 
 def prepare_code_vulnerabilities_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
         code_analysis = mobsf_output["code_analysis"]["findings"]
-
-        return code_analysis, computed_with
     except Exception:
-        return {}, computed_with
+        code_analysis = {}
+
+    return encapsulate(code_analysis, computed_with)
 
 
 def prepare_code_analysis_output(sha256):
@@ -309,8 +368,8 @@ def prepare_code_analysis_output(sha256):
     code_vulnerabilities = prepare_code_vulnerabilities_output(sha256)
 
     code_analysis = {
-        f"niap_analysis[{niap_analysis[1]}]": niap_analysis[0],
-        f"code_vulnerabilties[{code_vulnerabilities[1]}]": code_vulnerabilities[0],
+        "niap_analysis": niap_analysis,
+        "code_vulnerabilties": code_vulnerabilities,
     }
 
     return code_analysis
@@ -320,45 +379,43 @@ def prepare_code_analysis_output(sha256):
 
 
 def prepare_threat_analysis_output(sha256):
-    computed_with = "quark_engine"
+    computed_with = ["quark_engine"]
     try:
-        quark_engine_output = get_tool_analysis(sha256, computed_with)
+        quark_engine_output = get_tool_analysis(sha256, computed_with[0])
         crimes = quark_engine_output["crimes"]
 
-        threats = []
+        threat_analysis = []
         for c in crimes:
             crime = c["crime"]
             confidence = c["confidence"]
 
-            threats.append({"crime": crime, "confidence": confidence})
-
-        threat_analysis = threats
-
-        return threat_analysis, computed_with
+            threat_analysis.append({"crime": crime, "confidence": confidence})
     except Exception:
-        return {}, computed_with
+        threat_analysis = []
+
+    return encapsulate(threat_analysis, computed_with)
 
 
 def prepare_permission_analysis_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
         mobsf_output = get_tool_analysis(sha256, computed_with)
         permission_analysis = mobsf_output["permissions"]
-
-        return permission_analysis, computed_with
     except Exception:
-        return {}, computed_with
+        permission_analysis = {}
+
+    return encapsulate(permission_analysis, computed_with)
 
 
 def prepare_detailed_permissions_analysis_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
         detailed_permissions = mobsf_output["android_api"]
-
-        return detailed_permissions, computed_with
     except Exception:
-        return {}, computed_with
+        detailed_permissions = {}
+
+    return encapsulate(detailed_permissions, computed_with)
 
 
 def prepare_behavior_analysis_output(sha256):
@@ -367,11 +424,9 @@ def prepare_behavior_analysis_output(sha256):
     detailed_permissions_analysis = prepare_detailed_permissions_analysis_output(sha256)
 
     behavior_analysis = {
-        f"threats[{threat_analysis[1]}]": threat_analysis[0],
-        f"permissions[{permission_analysis[1]}]": permission_analysis[0],
-        f"detailed_permissions[{detailed_permissions_analysis[1]}]": detailed_permissions_analysis[
-            0
-        ],
+        "threats": threat_analysis,
+        "permissions": permission_analysis,
+        "detailed_permissions": detailed_permissions_analysis,
     }
 
     return behavior_analysis
@@ -381,25 +436,25 @@ def prepare_behavior_analysis_output(sha256):
 
 
 def prepare_domain_analysis_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
         domains = mobsf_output["domains"]
-
-        return domains, computed_with
     except Exception:
-        return {}, computed_with
+        domains = {}
+
+    return encapsulate(domains, computed_with)
 
 
 def prepare_url_analysis_output(sha256):
-    computed_with = "mobsf"
+    computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
         urls = mobsf_output["urls"]
-
-        return urls, computed_with
     except Exception:
-        return {}, computed_with
+        urls = []
+
+    return encapsulate(urls, computed_with)
 
 
 def prepare_network_analysis_output(sha256):
@@ -407,8 +462,8 @@ def prepare_network_analysis_output(sha256):
     urls = prepare_url_analysis_output(sha256)
 
     network_analysis = {
-        f"domains[{domains[1]}]": domains[0],
-        f"urls[{urls[1]}]": urls[0],
+        "domains": domains,
+        "urls": urls,
     }
 
     return network_analysis
