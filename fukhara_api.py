@@ -8,13 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic_core.core_schema import TaggedUnionSchema
-
+ 
 from api_formatter import *
 from awesome_analysis_engine import analyze
 from docs.api import *
-from mongodb_handler import (
-    get_analysis_status,
-    list_apk_analyses,
+from postgres_handler import (
+        init_schema,
+        get_analysis_status,
+        list_apk_analyses
 )
 
 # from ssdeep_compare import hash_compare
@@ -71,6 +72,7 @@ tags_metadata = [
 
 ################################################# API  #################################################
 
+init_schema()
 app = FastAPI(openapi_tags=tags_metadata)
 
 app.add_middleware(

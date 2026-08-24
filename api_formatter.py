@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from mongodb_handler import (
+from postgres_handler import (
     get_analysis_upload_timestamp,
     get_fuzzy_hash_analysis,
     get_tool_analysis,
 )
+
 from tools import malwarebazaar_analysis
 
 

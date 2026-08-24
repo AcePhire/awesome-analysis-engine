@@ -1,69 +1,14 @@
 version: "3"
 services:
-  mongo:
-    image: mongo
+  postgres:
+    image: postgres
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: fukhara
-      MONGO_INITDB_ROOT_PASSWORD: fukhara
-    networks:
-      - fukhara
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: fukhara
+      POSTGRES_DB: fukhara
     ports:
-      - 27017:27017
-  mongo-express:
-    image: mongo-express
-    restart: always
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: fukhara
-      ME_CONFIG_MONGODB_ADMINPASSWORD: fukhara
-      ME_CONFIG_BASICAUTH_USERNAME: fukhara
-      ME_CONFIG_BASICAUTH_PASSWORD: fukhara
-      ME_CONFIG_MONGODB_URL: mongodb://fukhara:fukhara@mongo:27017/
-    networks:
-      - fukhara
-    ports:
-      - 8081:8081
-  # elasticsearch:
-  #   image: docker.elastic.co/elasticsearch/elasticsearch:9.2.4
-  #   hostname: elasticsearch
-  #   environment:
-  #     - node.name=elasticsearch
-  #     - cluster.name-es-docker-cluster
-  #     - discovery.type=single-node
-  #     - bootstrap.memory_lock=true
-  #     - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-  #     - xpack.security.enabled=false
-  #     - xpack.security.enrollment.enabled=false
-  #   ulimits:
-  #     memlock:
-  #       soft: -1
-  #       hard: -1
-  #   networks:
-  #     - fukhara
-  #   ports:
-  #     - 9200:9200
-  #     - 9300:9300
-  #   elastic-connector:
-  #     image: docker.elastic.co/integrations/elastic-connectors:9.2.4
-  #     volumes:
-  #       - ./elastic-connectors:/config
-  #     command:
-  #     - /app/bin/elastic-ingest
-  #     - -c
-  #     - /config/config.yml
-  #     networks:
-  #      - fukhara
-  #   kibana:
-  #     image: docker.elastic.co/kibana/kibana:9.2.4
-  #     environment:
-  #       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-  #       - xpack.security.enabled=false
-  #    volumes:
-  #      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
-  #     networks:
-  #       - fukhara
-  #     ports:
-  #       - 5601:5601
+      - 5432:5432
   mobsf:
     image: opensecurity/mobile-security-framework-mobsf:latest
     environment:

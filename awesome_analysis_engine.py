@@ -1,6 +1,6 @@
 import asyncio
 
-from mongodb_handler import (
+from postgres_handler import (
     add_fuzzy_hash,
     add_tool_analysis,
     create_apk_analysis,
@@ -25,7 +25,7 @@ async def run_fuzzy_hashes_analysis(fuzzy_hash_func, name, path):
 
 # Analyze APK using multiple tools
 async def analyze(path):
-    file_hash = create_apk_analysis(path)
+    file_hash = create_apk_analysis(path) 
 
     await asyncio.gather(
         run_analysis_tool(mobsf_analysis, "mobsf", path),
