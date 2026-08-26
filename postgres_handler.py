@@ -24,8 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_apk_analysis_tool_results_gin
     ON apk_analysis USING GIN (tool_results);
 """
 
-FUZZY_HASHES_SCHEMA =
-"""
+FUZZY_HASHES_SCHEMA = """
 CREATE TABLE IF NOT EXISTS fuzzy_hashes (
     id          SERIAL PRIMARY KEY,
     sha256      TEXT NOT NULL,
@@ -36,8 +35,7 @@ CREATE TABLE IF NOT EXISTS fuzzy_hashes (
 );
 """
 
-FUZZY_HASHES_GIN_SHCEMA = 
-"""
+FUZZY_HASHES_GIN_SHCEMA = """
 CREATE INDEX IF NOT EXISTS idx_fuzzy_hashes_sha256_tool
     ON fuzzy_hashes (sha256, tool);
 """
