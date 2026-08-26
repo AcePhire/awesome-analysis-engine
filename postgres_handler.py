@@ -63,26 +63,25 @@ def create_apk_analysis(path):
     conn = _get_conn()
     try:
         sha256 = hash_file(path)
-        uploaded_at = str(datetime.now())
+        uploaded_at = datetime.now(timezone.utc)
         with conn.cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO apk_analysis (sha256, uploaded_at, status)
                 VALUES (%s, %s, 'pending')
                 ON CONFLICT (sha256) DO NOTHING
-             sha256   """,
+                """,
                 (sha256, uploaded_at),
             )
         conn.commit()
-    except Exception:
+    except Exception as e:
+        print(e)
         conn.rollback()
     finally:
         _put_conn(conn)
 
 
 def add_tool_analysis(sha256, tool_name, result):
-    """Merge {tool_name: result} into the tool_results JSONB column,
-    equivalent to Mongo's $set: {tool_name: result} on the document."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -144,6 +143,7 @@ def get_analysis_upload_timestamp(sha256):
                 "SELECT uploaded_at FROM apk_analysis WHERE sha256 = %s", (sha256,)
             )
             row = cur.fetchone()
+            print(row[0])
             return row[0] if row else None
     finally:
         _put_conn(conn)
@@ -163,9 +163,6 @@ def set_analysis_status(sha256, status):
 
 
 def find_by_tool_result(tool_name, contains):
-    """Bonus helper enabled by the GIN index: find sha256s where
-    tool_results->tool_name contains the given dict, e.g.
-    find_by_tool_result('mobsf', {'verdict': 'malware'})."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:

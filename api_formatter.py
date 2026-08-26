@@ -102,7 +102,7 @@ def prepare_fingerprints_output(sha256):
 def prepare_sample_timeline_output(sha256):
     computed_with = ["fukhara", "virustotal"]
     try:
-        upload_timestamp = get_analysis_upload_timestamp(sha256)
+        upload_timestamp = str(get_analysis_upload_timestamp(sha256))
         virustotal_output = get_tool_analysis(sha256, computed_with[1])["data"][
             "attributes"
         ]
