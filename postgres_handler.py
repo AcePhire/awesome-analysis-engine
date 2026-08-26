@@ -8,44 +8,24 @@ from psycopg2.pool import SimpleConnectionPool
 from utils import hash_file
 
 DSN = "dbname=fukhara user=postgres password=fukhara host=localhost port=5432"
-
 _pool = SimpleConnectionPool(minconn=1, maxconn=10, dsn=DSN)
 
-
-def _get_conn():
-    return _pool.getconn()
-
-
-def _put_conn(conn):
-    _pool.putconn(conn)
-
-
-# ---------------------------------------------------------------------------
-# Schema
-# ---------------------------------------------------------------------------
-# apk_analysis.tool_results holds per-tool results as JSONB, e.g.
-#   {"mobsf": {...}, "apkid": {...}, "virustotal": {...}}
-# A GIN index on tool_results lets you do containment queries
-# (tool_results @> '{"mobsf": {...}}') and existence checks
-# (tool_results ? 'mobsf') efficiently, instead of Mongo's per-field
-# top-level document keys.
-
-SCHEMA_SQL = """
+APK_ANALYSIS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS apk_analysis (
     sha256       TEXT PRIMARY KEY,
     uploaded_at  TIMESTAMPTZ NOT NULL,
     status       TEXT NOT NULL DEFAULT 'pending',
     tool_results JSONB NOT NULL DEFAULT '{}'::jsonb
 );
+"""
 
+APK_ANALYSIS_GIN_SCHEMA = """
 CREATE INDEX IF NOT EXISTS idx_apk_analysis_tool_results_gin
     ON apk_analysis USING GIN (tool_results);
+"""
 
--- jsonb_path_ops variant is smaller/faster if you only ever do
--- containment (@>) queries and don't need key-existence (?) queries:
--- CREATE INDEX IF NOT EXISTS idx_apk_analysis_tool_results_gin_pathops
---     ON apk_analysis USING GIN (tool_results jsonb_path_ops);
-
+FUZZY_HASHES_SCHEMA =
+"""
 CREATE TABLE IF NOT EXISTS fuzzy_hashes (
     id          SERIAL PRIMARY KEY,
     sha256      TEXT NOT NULL,
@@ -54,25 +34,33 @@ CREATE TABLE IF NOT EXISTS fuzzy_hashes (
     fuzzy_hash  TEXT NOT NULL,
     UNIQUE (sha256, tool, filename, fuzzy_hash)
 );
+"""
 
+FUZZY_HASHES_GIN_SHCEMA = 
+"""
 CREATE INDEX IF NOT EXISTS idx_fuzzy_hashes_sha256_tool
     ON fuzzy_hashes (sha256, tool);
 """
 
+def _get_conn():
+    return _pool.getconn()
+
+def _put_conn(conn):
+    _pool.putconn(conn)
 
 def init_schema():
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(SCHEMA_SQL)
+            cur.execute(APK_ANALYSIS_SCHEMA)
+            cur.execute(APK_ANALYSIS_GIN_SCHEMA)
+            cur.execute(FUZZY_HASHES_SCHEMA)
+            cur.execute(FUZZY_HASHES_GIN_SHCEMA)
         conn.commit()
     finally:
         _put_conn(conn)
 
 
-# ---------------------------------------------------------------------------
-# apk_analysis
-# ---------------------------------------------------------------------------
 def create_apk_analysis(path):
     conn = _get_conn()
     try:
@@ -195,9 +183,6 @@ def find_by_tool_result(tool_name, contains):
         _put_conn(conn)
 
 
-# ---------------------------------------------------------------------------
-# fuzzy_hashes
-# ---------------------------------------------------------------------------
 def add_fuzzy_hash(sha256, tool, filename, fuzzy_hash):
     conn = _get_conn()
     try:
