@@ -1,0 +1,12 @@
+.git
+.env
+apk_files/
+reports/
+elastic-connectors/
+__pycache__/
+**/__pycache__/
+docker-compose.yaml
+kibana.yml
+tool_images/
+apk_info/
+yara_analyzer/
