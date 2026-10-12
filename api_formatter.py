@@ -184,7 +184,8 @@ def prepare_popular_av_detections_output(sha256):
 def prepare_yara_analysis_output(sha256):
     computed_with = ["yara_analyzer"]
     try:
-        yara_analysis_output = get_tool_analysis(sha256, computed_with[0])
+        # The analysis engine stores the result under "yara"
+        yara_analysis_output = get_tool_analysis(sha256, "yara")
 
         yara_matches = {"matches": yara_analysis_output["matches"]}
 
