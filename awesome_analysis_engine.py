@@ -38,7 +38,7 @@ TOOLS_TOTAL = 9
 async def analyze(path):
     file_hash = create_apk_analysis(path)
 
-    await asyncio.gather(
+    results = await asyncio.gather(
         run_analysis_tool(mobsf_analysis, "mobsf", path),
         run_analysis_tool(apkid_analysis, "apkid", path),
         run_fuzzy_hashes_analysis(ssdeep_analysis, "ssdeep", path),
@@ -48,6 +48,8 @@ async def analyze(path):
         run_analysis_tool(malwarebazaar_analysis, "malwarebazaar", path),
         run_analysis_tool(apk_info_analysis, "apk_info", path),
         run_analysis_tool(yara_analysis, "yara", path),
+        return_exceptions=True,
     )
 
-    set_analysis_status(file_hash, "completed")
+    failed = all(isinstance(result, Exception) for result in results)
+    set_analysis_status(file_hash, "failed" if failed else "completed")
