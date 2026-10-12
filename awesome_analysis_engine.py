@@ -4,6 +4,7 @@ from mongodb_handler import (
     add_fuzzy_hash,
     add_tool_analysis,
     create_apk_analysis,
+    mark_tool_done,
     set_analysis_status,
 )
 from tools import *
@@ -12,15 +13,25 @@ from utils import hash_file
 
 async def run_analysis_tool(analysis_func, name, path):
     file_hash = hash_file(path)
-    result = await asyncio.to_thread(analysis_func, path)
-    add_tool_analysis(file_hash, name, result)
+    try:
+        result = await asyncio.to_thread(analysis_func, path)
+        add_tool_analysis(file_hash, name, result)
+    finally:
+        mark_tool_done(file_hash, name)
 
 
 async def run_fuzzy_hashes_analysis(fuzzy_hash_func, name, path):
     file_hash = hash_file(path)
-    fuzzy_hashes = await asyncio.to_thread(fuzzy_hash_func, path)
-    for fuzzy_hash in fuzzy_hashes:
-        add_fuzzy_hash(file_hash, name, fuzzy_hash[0], fuzzy_hash[1])
+    try:
+        fuzzy_hashes = await asyncio.to_thread(fuzzy_hash_func, path)
+        for fuzzy_hash in fuzzy_hashes:
+            add_fuzzy_hash(file_hash, name, fuzzy_hash[0], fuzzy_hash[1])
+    finally:
+        mark_tool_done(file_hash, name)
+
+
+# Number of tools run by analyze(), reported with the analysis progress
+TOOLS_TOTAL = 9
 
 
 # Analyze APK using multiple tools

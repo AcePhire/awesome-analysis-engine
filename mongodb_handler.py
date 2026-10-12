@@ -35,6 +35,7 @@ def create_apk_analysis(path):
             "sha256": sha256,
             "uploaded_at": uploaded_at,
             "status": "pending",
+            "tools_done": [],
         }
         _get_apk_analysis_collection().insert_one(apk_analysis)
     except:
@@ -64,6 +65,12 @@ def add_tool_analysis(sha256, tool_name, result):
     )
 
 
+def mark_tool_done(sha256, tool_name):
+    _get_apk_analysis_collection().update_one(
+        {"sha256": sha256}, {"$addToSet": {"tools_done": tool_name}}
+    )
+
+
 def list_apk_analyses():
     return _get_apk_analysis_collection().distinct("sha256")
 
@@ -78,6 +85,13 @@ def get_fuzzy_hash_analysis(sha256, tool_name):
 
 def get_analysis_status(sha256):
     return _get_apk_analysis_collection().find_one({"sha256": sha256}).get("status")
+
+
+def get_analysis_progress(sha256):
+    return _get_apk_analysis_collection().find_one(
+        {"sha256": sha256},
+        {"_id": 0, "sha256": 1, "status": 1, "uploaded_at": 1, "tools_done": 1},
+    )
 
 
 def get_analysis_upload_timestamp(sha256):
