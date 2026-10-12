@@ -1,7 +1,9 @@
 import asyncio
 import json
 import logging
+import os
 import shutil
+import uuid
 from typing import Annotated
 
 from fastapi import FastAPI, File, HTTPException, Path, UploadFile
@@ -23,6 +25,9 @@ from mongodb_handler import (
 
 # from ssdeep_compare import hash_compare
 from utils import hash_file
+
+APK_DIR = os.getenv("APK_DIR", "apk_files")
+os.makedirs(APK_DIR, exist_ok=True)
 
 # Keep references to running analyses so they aren't garbage collected
 analysis_tasks = set()
@@ -116,13 +121,16 @@ async def home():
 async def analyze_apk(
     file: Annotated[UploadFile, File(description="APK file to analyze")],
 ):
-    # Path("apk_files").mkdir(exist_ok=True)
-    path = f"apk_files/{file.filename}"
+    
+    upload_path = os.path.join(APK_DIR, f"{uuid.uuid4().hex}.upload")
 
-    with open(path, "wb") as buffer:
+    with open(upload_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    sha256 = hash_file(path)
+    sha256 = hash_file(upload_path)
+    path = os.path.join(APK_DIR, f"{sha256}.apk")
+    os.replace(upload_path, path)
+
     task = asyncio.create_task(analyze(path))
     analysis_tasks.add(task)
     task.add_done_callback(analysis_tasks.discard)
