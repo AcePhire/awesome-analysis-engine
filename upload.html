@@ -21,7 +21,7 @@
 
                     // Send the file to FastAPI
                     const response = await fetch(
-                        "http://127.0.0.1:8000/api/analyze/",
+                        "/api/analyze/",
                         {
                             method: "POST",
                             body: formData,
@@ -32,7 +32,7 @@
                     const data = await response.json();
 
                     // Redirect using the ID returned by FastAPI
-                    window.location.href = `http://127.0.0.1:8000/api/report/${data.id}/`;
+                    window.location.href = `/api/report/${data.id}/`;
                 });
         </script>
     </body>
