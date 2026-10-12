@@ -1,11 +1,14 @@
 import asyncio
 import json
+import logging
 import shutil
 from typing import Annotated
 
 from fastapi import FastAPI, File, Path, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic_core.core_schema import TaggedUnionSchema
 
@@ -72,6 +75,19 @@ tags_metadata = [
 ################################################# API  #################################################
 
 app = FastAPI(openapi_tags=tags_metadata)
+
+logger = logging.getLogger("uvicorn.error")
+
+
+# a value can fall outside the documented schema. serve the data as-is and log the mismatch 
+@app.exception_handler(ResponseValidationError)
+async def serve_unvalidated_response(request, exc):
+    problems = "; ".join(
+        f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+        for error in exc.errors()[:5]
+    )
+    logger.warning("%s does not match its response schema: %s", request.url.path, problems)
+    return JSONResponse(content=jsonable_encoder(exc.body))
 
 app.add_middleware(
     CORSMiddleware,
