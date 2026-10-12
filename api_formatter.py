@@ -422,7 +422,7 @@ def prepare_threat_analysis_output(sha256):
 def prepare_permission_analysis_output(sha256):
     computed_with = ["mobsf"]
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with)
+        mobsf_output = get_tool_analysis(sha256, computed_with[0])
         permission_analysis = mobsf_output["permissions"]
     except Exception:
         permission_analysis = {}
