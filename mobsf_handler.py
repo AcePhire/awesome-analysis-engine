@@ -1,26 +1,12 @@
-import docker
+import os
+
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from utils import hash_file, resolve_path
 
-MOBSF_API_KEY = "515d3578262a2539cd13b5b9946fe17e350c321b91faeb1ee56095430242a4a9"
-MOBSF_PORT = "8181"
-MOBSF_DOMAIN = f"http://127.0.0.1:{MOBSF_PORT}"
-
-client = docker.from_env()
-
-
-# Start MobSF container
-def run_mobsf(port):
-    container = client.containers.run(
-        "opensecurity/mobile-security-framework-mobsf:latest",
-        detach=True,
-        environment=["MOBSF_API_ONLY=0", f"MOBSF_API_KEY={MOBSF_API_KEY}"],
-        ports={"8000": MOBSF_PORT},
-    )
-
-    return container
+MOBSF_API_KEY = os.getenv("MOBSF_API_KEY")
+MOBSF_DOMAIN = os.getenv("MOBSF_URL", "http://127.0.0.1:8181")
 
 
 # Upload file to MobSF
