@@ -4,7 +4,7 @@ import logging
 import shutil
 from typing import Annotated
 
-from fastapi import FastAPI, File, Path, UploadFile
+from fastapi import FastAPI, File, HTTPException, Path, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,9 +13,10 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic_core.core_schema import TaggedUnionSchema
 
 from api_formatter import *
-from awesome_analysis_engine import analyze
+from awesome_analysis_engine import TOOLS_TOTAL, analyze
 from docs.api import *
 from mongodb_handler import (
+    get_analysis_progress,
     get_analysis_status,
     list_apk_analyses,
 )
@@ -166,6 +167,33 @@ async def get_report(
     data = prepare_report_output(id)
 
     return data
+
+
+@app.get(
+    "/api/report/{id}/status/",
+    summary="Get the analysis status",
+    description="Return the analysis status (pending, completed or failed) and which tools have finished running",
+    tags=["Analysis Report"],
+    response_model=AnalysisStatusResponse,
+    responses={404: {"description": "No analysis exists for this ID"}},
+)
+async def get_status(
+    id: Annotated[
+        str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
+    ],
+):
+    progress = get_analysis_progress(id)
+
+    if progress is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    return {
+        "id": progress["sha256"],
+        "status": progress.get("status", "pending"),
+        "uploaded_at": progress.get("uploaded_at"),
+        "tools_done": progress.get("tools_done", []),
+        "tools_total": TOOLS_TOTAL,
+    }
 
 ##########################################################################
 

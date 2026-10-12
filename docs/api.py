@@ -1925,3 +1925,28 @@ class AnalyzeResponse(BaseModel):
         description="SHA-256 hash of the submitted APK, used as the analysis report ID",
         examples=["39ac2d9fe73cb2b4d16ae34bb27dce263c338f1c4e443213302bc3493e9de7eb"],
     )
+
+
+class AnalysisStatusResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "39ac2d9fe73cb2b4d16ae34bb27dce263c338f1c4e443213302bc3493e9de7eb",
+                "status": "pending",
+                "uploaded_at": "2026-10-11 12:00:00.000000",
+                "tools_done": ["virustotal", "malwarebazaar", "mobsf"],
+                "tools_total": 9,
+            }
+        }
+    )
+
+    id: str = Field(description="SHA-256 hash of the APK")
+    status: str = Field(
+        description="Analysis status: pending, completed or failed",
+        examples=["pending"],
+    )
+    uploaded_at: str | None = Field(default=None)
+    tools_done: list[str] = Field(
+        default_factory=list, description="Tools that have finished running"
+    )
+    tools_total: int = Field(description="Number of tools the analysis runs")
