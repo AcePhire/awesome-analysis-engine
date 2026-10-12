@@ -1,13 +1,17 @@
+import os
 from datetime import datetime
 
 from pymongo import MongoClient
 
 from utils import hash_file
 
+CONNECTION_STRING = os.getenv("MONGO_URI", "mongodb://fukhara:fukhara@localhost:27017/")
+
+_mongo_client = MongoClient(CONNECTION_STRING)
+
 
 def _get_mongo_client():
-    CONNECTION_STRING = "mongodb://fukhara:fukhara@localhost:27017/"
-    return MongoClient(CONNECTION_STRING)
+    return _mongo_client
 
 
 def _get_db():
