@@ -24,6 +24,9 @@ from mongodb_handler import (
 # from ssdeep_compare import hash_compare
 from utils import hash_file
 
+# Keep references to running analyses so they aren't garbage collected
+analysis_tasks = set()
+
 # Metadata for each tag group — this is what renders as the section
 # headers/descriptions in Swagger UI (/docs) and ReDoc (/redoc).
 tags_metadata = [
@@ -120,7 +123,9 @@ async def analyze_apk(
         shutil.copyfileobj(file.file, buffer)
 
     sha256 = hash_file(path)
-    asyncio.create_task(analyze(path))
+    task = asyncio.create_task(analyze(path))
+    analysis_tasks.add(task)
+    task.add_done_callback(analysis_tasks.discard)
 
     return {"status": "success", "id": sha256}
 
