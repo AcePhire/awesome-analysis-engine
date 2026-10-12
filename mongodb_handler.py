@@ -38,8 +38,13 @@ def create_apk_analysis(path):
             "tools_done": [],
         }
         _get_apk_analysis_collection().insert_one(apk_analysis)
-    except:
-        pass
+    except Exception:
+        # Re-submitting a known APK: re-run the analysis on the same document
+        _get_apk_analysis_collection().update_one(
+            {"sha256": sha256}, {"$set": {"status": "pending", "tools_done": []}}
+        )
+
+    return sha256
 
 
 def add_fuzzy_hash(sha256, tool, filename, fuzzy_hash):
