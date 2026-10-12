@@ -12,7 +12,6 @@ from fastapi.exceptions import ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from pydantic_core.core_schema import TaggedUnionSchema
 
 from api_formatter import *
 from awesome_analysis_engine import TOOLS_TOTAL, analyze
