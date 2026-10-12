@@ -268,6 +268,12 @@ def prepare_manifest_analysis_output(sha256):
 
         manifest_analysis = mobsf_output["manifest_analysis"]["manifest_findings"]
 
+        # MobSF mixes numbers into "component" (e.g. ["285", 2]); the API
+        # contract is a list of strings.
+        for finding in manifest_analysis:
+            if isinstance(finding.get("component"), list):
+                finding["component"] = [str(item) for item in finding["component"]]
+
     except Exception:
         manifest_analysis = {}
 
