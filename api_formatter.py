@@ -215,26 +215,42 @@ def prepare_threat_intelligence_output(sha256):
 
 def prepare_apk_details_output(sha256):
     computed_with = ["mobsf", "apk_info"]
+
+    # Each source is read on its own: a tool that failed on this APK must not
+    # hide what the other one found. apk_info (Google Play style signature)
+    # wins when present, MobSF fills the gaps.
     try:
-        mobsf_output = get_tool_analysis(sha256, computed_with[0])
-        apk_info = get_tool_analysis(sha256, computed_with[1])
-        frosting_info = apk_info["frosting_info"]
-        google_play_info = apk_info["google_play_info"]
-        sign = google_play_info["sign"]
-
-        apk_details = {
-            "package": sign["handle"],
-            "app_name": sign["app_name"],
-            "version_name": sign["version_name"],
-            "version_code": sign["version_code"],
-            "sdk": f"{sign['min_sdk_version']} - {sign['max_sdk_version']}",
-            "uaid": sign["uaid"],
-            "signature": mobsf_output["certificate_analysis"]["certificate_info"],
-            "frosting": frosting_info,
-        }
-
+        mobsf_output = get_tool_analysis(sha256, "mobsf")
     except Exception:
-        apk_details = {}
+        mobsf_output = None
+    try:
+        apk_info = get_tool_analysis(sha256, "apk_info")
+        sign = apk_info["google_play_info"]["sign"]
+        frosting_info = apk_info.get("frosting_info")
+    except Exception:
+        sign, frosting_info = None, None
+
+    mobsf_output = mobsf_output if isinstance(mobsf_output, dict) else {}
+    sign = sign if isinstance(sign, dict) else {}
+
+    def first(*values):
+        return next((value for value in values if value not in (None, "")), None)
+
+    min_sdk = first(sign.get("min_sdk_version"), mobsf_output.get("min_sdk"))
+    max_sdk = first(sign.get("max_sdk_version"), mobsf_output.get("max_sdk"))
+
+    apk_details = {
+        "package": first(sign.get("handle"), mobsf_output.get("package_name")),
+        "app_name": first(sign.get("app_name"), mobsf_output.get("app_name")),
+        "version_name": first(sign.get("version_name"), mobsf_output.get("version_name")),
+        "version_code": first(sign.get("version_code"), mobsf_output.get("version_code")),
+        "sdk": f"{min_sdk} - {max_sdk}" if min_sdk or max_sdk else None,
+        "uaid": sign.get("uaid"),
+        "signature": (mobsf_output.get("certificate_analysis") or {}).get("certificate_info"),
+        "frosting": frosting_info,
+    }
+    # Only report what the tools actually found
+    apk_details = {key: value for key, value in apk_details.items() if value is not None}
 
     return encapsulate(apk_details, computed_with)
 
