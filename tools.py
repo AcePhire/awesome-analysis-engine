@@ -10,15 +10,23 @@ import requests
 from dotenv import load_dotenv
 
 from mobsf_handler import scan_file_in_mobsf, upload_file_to_mobsf
-from utils import csv_to_json, hash_file, resolve_path
+from utils import csv_to_json, hash_file
 
 # Load environment variables
 load_dotenv()
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 MALWAREBAZAAR_API_KEY = os.getenv("MALWAREBAZAAR_API_KEY")
 
+APK_DIR = Path(os.getenv("APK_DIR", "apk_files")).resolve()
+APK_VOLUME = os.getenv("APK_VOLUME", str(APK_DIR))
+TOOL_VOLUMES = {APK_VOLUME: {"bind": "/analysis", "mode": "ro"}}
+
 # Load docker daemon
 client = docker.from_env()
+
+
+def tool_path(path):
+    return f"/analysis/{Path(path).resolve().relative_to(APK_DIR)}"
 
 
 # Analyze using MobSF
@@ -41,11 +49,12 @@ def mobsf_analysis(path):
 
 # Analyze using APKiD
 def apkid_analysis(path):
-    file, directory = resolve_path(path)
-
     try:
         container = client.containers.run(
-            "rednaga:apkid", volumes=[f"{directory}:/input:ro"], command=f"-j {file}"
+            "fukhara/apkid",
+            volumes=TOOL_VOLUMES,
+            remove=True,
+            command=["-j", tool_path(path)],
         )
         data = json.loads(container.decode("utf-8"))
     except Exception:
@@ -57,7 +66,7 @@ def apkid_analysis(path):
 
 # Analyze using ssdeep
 def ssdeep_analysis(path):
-    with TemporaryDirectory() as tmp_dir:
+    with TemporaryDirectory(dir=APK_DIR) as tmp_dir:
         with zipfile.ZipFile(path, "r") as apk:
             file_list = apk.namelist()
 
@@ -78,9 +87,10 @@ def ssdeep_analysis(path):
 
         try:
             container = client.containers.run(
-                "cincan/ssdeep",
-                volumes=[f"{Path(tmp_dir)}:/analysis:ro"],
-                working_dir="/analysis",
+                "fukhara/ssdeep",
+                volumes=TOOL_VOLUMES,
+                remove=True,
+                working_dir=tool_path(tmp_dir),
                 command=[f.name for f in Path(tmp_dir).iterdir()],
             )
 
@@ -101,17 +111,16 @@ def ssdeep_analysis(path):
 
 # Analyze using Quark Engine
 def quark_engine_analysis(path):
-    file, directory = resolve_path(path)
-
     try:
         container = client.containers.run(
-            "ev-flow/quark-engine",
-            volumes=[f"{directory}:/analysis:ro"],
+            "fukhara/quark-engine",
+            volumes=TOOL_VOLUMES,
+            remove=True,
             entrypoint="",
             command=[
-                "/bin/bash",
+                "/bin/sh",
                 "-c",
-                f"pipenv run quark -a /analysis/{file} -o output.json > /dev/null && cat output.json",
+                f"quark -a {tool_path(path)} -o output.json > /dev/null && cat output.json",
             ],
         )
 
@@ -125,17 +134,12 @@ def quark_engine_analysis(path):
 
 # Analyze using AndroCFG
 def androcfg_analysis(path):
-    file, directory = resolve_path(path)
-
     try:
         container = client.containers.run(
-            "u039b/androcfg",
-            volumes=[f"{directory}:/analysis:ro"],
-            command=[
-                "/bin/bash",
-                "-c",
-                f"AndroCFG -a /analysis/{file} -o output && cat output/report.json",
-            ],
+            "fukhara/androcfg",
+            volumes=TOOL_VOLUMES,
+            remove=True,
+            command=[tool_path(path)],
         )
 
         data = json.loads(container.decode("utf-8"))
@@ -185,13 +189,12 @@ def malwarebazaar_analysis(path):
 
 # Get APK info
 def apk_info_analysis(path):
-    file, directory = resolve_path(path)
-
     try:
         container = client.containers.run(
-            "acephire/apk_info",
-            volumes=[f"{directory}:/analysis:ro"],
-            command=f"/analysis/{file}",
+            "fukhara/apk_info",
+            volumes=TOOL_VOLUMES,
+            remove=True,
+            command=[tool_path(path)],
         )
 
         data = json.loads(container.decode("utf-8"))
@@ -204,16 +207,13 @@ def apk_info_analysis(path):
 
 # Analyze using Yara Analyzer
 def yara_analysis(path):
-    file, directory = resolve_path(path)
-    rules_path = (
-        "/home/acephire/Documents/projects/awesome-analysis-engine/yara_analyzer/rules/"
-    )
-
+    # The rules are baked into the image (yara_analyzer/rules)
     try:
         container = client.containers.run(
-            "acephire/yara_analyzer",
-            volumes=[f"{directory}:/analysis:ro", f"{rules_path}:/rules/:ro"],
-            command=[f"/analysis/{file}", "/rules/android.yara"],
+            "fukhara/yara_analyzer",
+            volumes=TOOL_VOLUMES,
+            remove=True,
+            command=[tool_path(path), "/yara_analyzer/rules/android.yara"],
         )
 
         data = json.loads(container.decode("utf-8"))
