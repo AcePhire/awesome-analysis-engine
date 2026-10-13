@@ -4,6 +4,7 @@ from mongodb_handler import (
     add_fuzzy_hash,
     add_tool_analysis,
     create_apk_analysis,
+    mark_tool_done,
     set_analysis_status,
 )
 from tools import *
@@ -12,22 +13,32 @@ from utils import hash_file
 
 async def run_analysis_tool(analysis_func, name, path):
     file_hash = hash_file(path)
-    result = await asyncio.to_thread(analysis_func, path)
-    add_tool_analysis(file_hash, name, result)
+    try:
+        result = await asyncio.to_thread(analysis_func, path)
+        add_tool_analysis(file_hash, name, result)
+    finally:
+        mark_tool_done(file_hash, name)
 
 
 async def run_fuzzy_hashes_analysis(fuzzy_hash_func, name, path):
     file_hash = hash_file(path)
-    fuzzy_hashes = await asyncio.to_thread(fuzzy_hash_func, path)
-    for fuzzy_hash in fuzzy_hashes:
-        add_fuzzy_hash(file_hash, name, fuzzy_hash[0], fuzzy_hash[1])
+    try:
+        fuzzy_hashes = await asyncio.to_thread(fuzzy_hash_func, path)
+        for fuzzy_hash in fuzzy_hashes:
+            add_fuzzy_hash(file_hash, name, fuzzy_hash[0], fuzzy_hash[1])
+    finally:
+        mark_tool_done(file_hash, name)
+
+
+# Number of tools run by analyze(), reported with the analysis progress
+TOOLS_TOTAL = 9
 
 
 # Analyze APK using multiple tools
 async def analyze(path):
     file_hash = create_apk_analysis(path)
 
-    await asyncio.gather(
+    results = await asyncio.gather(
         run_analysis_tool(mobsf_analysis, "mobsf", path),
         run_analysis_tool(apkid_analysis, "apkid", path),
         run_fuzzy_hashes_analysis(ssdeep_analysis, "ssdeep", path),
@@ -37,6 +48,8 @@ async def analyze(path):
         run_analysis_tool(malwarebazaar_analysis, "malwarebazaar", path),
         run_analysis_tool(apk_info_analysis, "apk_info", path),
         run_analysis_tool(yara_analysis, "yara", path),
+        return_exceptions=True,
     )
 
-    set_analysis_status(file_hash, "completed")
+    failed = all(isinstance(result, Exception) for result in results)
+    set_analysis_status(file_hash, "failed" if failed else "completed")
