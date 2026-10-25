@@ -10,7 +10,9 @@ from mongodb_handler import (
 from tools import *
 from utils import hash_file
 
+TOOLS_TOTAL = 9
 
+# Run one tool in a thread, store its result and mark it done even if it fails
 async def run_analysis_tool(analysis_func, name, path):
     file_hash = hash_file(path)
     try:
@@ -20,6 +22,7 @@ async def run_analysis_tool(analysis_func, name, path):
         mark_tool_done(file_hash, name)
 
 
+# Run a fuzzy hashing tool in a thread, store each file's hash and mark it done
 async def run_fuzzy_hashes_analysis(fuzzy_hash_func, name, path):
     file_hash = hash_file(path)
     try:
@@ -30,11 +33,7 @@ async def run_fuzzy_hashes_analysis(fuzzy_hash_func, name, path):
         mark_tool_done(file_hash, name)
 
 
-# Number of tools run by analyze(), reported with the analysis progress
-TOOLS_TOTAL = 9
-
-
-# Analyze APK using multiple tools
+# Register the APK and run every tool concurrently, then set the final status
 async def analyze(path):
     file_hash = create_apk_analysis(path)
 

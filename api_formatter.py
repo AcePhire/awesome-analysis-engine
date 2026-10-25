@@ -8,6 +8,7 @@ from mongodb_handler import (
 from tools import malwarebazaar_analysis
 
 
+# Wrap a section's data with the list of tools that produced it
 def encapsulate(tool_output, computed_with):
     output = {}
     output["computed_with"] = computed_with
@@ -15,8 +16,8 @@ def encapsulate(tool_output, computed_with):
 
     return output
 
-################################################# VERDICT  #################################################
 
+# Build the final verdict section (placeholder, not computed yet)
 def prepare_verdict_output(sha256):
     computed_with = ["fukhara"]
     try:
@@ -31,9 +32,8 @@ def prepare_verdict_output(sha256):
 
     return encapsulate(verdict, computed_with)
 
-################################################# FINGERPRINTS  #################################################
 
-
+# Pull file size and MD5/SHA1/SHA256 from the MobSF result
 def prepare_checksums_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -51,6 +51,7 @@ def prepare_checksums_output(sha256):
     return encapsulate(checksums, computed_with)
 
 
+# Return APKiD's packer/obfuscator/compiler matches
 def prepare_identifers_output(sha256):
     computed_with = ["apkid"]
     try:
@@ -65,6 +66,7 @@ def prepare_identifers_output(sha256):
     return encapsulate(identifiers, computed_with)
 
 
+# Return the stored ssdeep hashes for each file in the APK
 def prepare_fuzzy_hash_output(sha256):
     computed_with = ["ssdeep"]
     try:
@@ -81,6 +83,7 @@ def prepare_fuzzy_hash_output(sha256):
     return encapsulate(fuzzy_hashes, computed_with)
 
 
+# Combine checksums, identifiers and fuzzy hashes into the fingerprints section
 def prepare_fingerprints_output(sha256):
     checksums = prepare_checksums_output(sha256)
     identifers = prepare_identifers_output(sha256)
@@ -95,9 +98,7 @@ def prepare_fingerprints_output(sha256):
     return fingerprints
 
 
-################################################# THREAT INTELLIGENCE  #################################################
-
-
+# Build the sample timeline from VirusTotal dates, cert validity and the Fukhara upload time
 def prepare_sample_timeline_output(sha256):
     computed_with = ["fukhara", "virustotal"]
     try:
@@ -134,6 +135,7 @@ def prepare_sample_timeline_output(sha256):
     return encapsulate(sample_timeline, computed_with)
 
 
+# Return VirusTotal and MalwareBazaar links for the sample when it's known there
 def prepare_third_party_apps_output(sha256):
     computed_with = ["virustotal", "malwarebazaar"]
 
@@ -159,6 +161,7 @@ def prepare_third_party_apps_output(sha256):
     return encapsulate(third_party_apps, computed_with)
 
 
+# Return VirusTotal's popular threat names with their detection counts
 def prepare_popular_av_detections_output(sha256):
     computed_with = ["virustotal"]
 
@@ -181,10 +184,10 @@ def prepare_popular_av_detections_output(sha256):
     return encapsulate(popular_av_detections, computed_with)
 
 
+# Return the YARA rule matches
 def prepare_yara_analysis_output(sha256):
     computed_with = ["yara_analyzer"]
     try:
-        # The analysis engine stores the result under "yara"
         yara_analysis_output = get_tool_analysis(sha256, "yara")
 
         yara_matches = {"matches": yara_analysis_output["matches"]}
@@ -195,6 +198,7 @@ def prepare_yara_analysis_output(sha256):
     return encapsulate(yara_matches, computed_with)
 
 
+# Combine timeline, YARA, AV detections and third-party links into the threat intel section
 def prepare_threat_intelligence_output(sha256):
     sample_timeline = prepare_sample_timeline_output(sha256)
     third_party_apps = prepare_third_party_apps_output(sha256)
@@ -211,15 +215,10 @@ def prepare_threat_intelligence_output(sha256):
     return threat_intelligence
 
 
-################################################# APPLICATION ANALYSIS  #################################################
-
-
+# Merge app metadata from apk_info and MobSF, preferring apk_info and dropping missing fields
 def prepare_apk_details_output(sha256):
     computed_with = ["mobsf", "apk_info"]
 
-    # Each source is read on its own: a tool that failed on this APK must not
-    # hide what the other one found. apk_info (Google Play style signature)
-    # wins when present, MobSF fills the gaps.
     try:
         mobsf_output = get_tool_analysis(sha256, "mobsf")
     except Exception:
@@ -234,6 +233,7 @@ def prepare_apk_details_output(sha256):
     mobsf_output = mobsf_output if isinstance(mobsf_output, dict) else {}
     sign = sign if isinstance(sign, dict) else {}
 
+    # Return the first value that isn't None or empty
     def first(*values):
         return next((value for value in values if value not in (None, "")), None)
 
@@ -250,12 +250,12 @@ def prepare_apk_details_output(sha256):
         "signature": (mobsf_output.get("certificate_analysis") or {}).get("certificate_info"),
         "frosting": frosting_info,
     }
-    # Only report what the tools actually found
     apk_details = {key: value for key, value in apk_details.items() if value is not None}
 
     return encapsulate(apk_details, computed_with)
 
 
+# Return fingerprints, issuer and validity of the first signing certificate
 def prepare_certificate_details_output(sha256):
     computed_with = ["apk_info"]
     try:
@@ -278,6 +278,7 @@ def prepare_certificate_details_output(sha256):
     return encapsulate(certificate_details, computed_with)
 
 
+# Return MobSF's manifest findings with components normalized to strings
 def prepare_manifest_analysis_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -285,8 +286,6 @@ def prepare_manifest_analysis_output(sha256):
 
         manifest_analysis = mobsf_output["manifest_analysis"]["manifest_findings"]
 
-        # MobSF mixes numbers into "component" (e.g. ["285", 2]); the API
-        # contract is a list of strings.
         for finding in manifest_analysis:
             if isinstance(finding.get("component"), list):
                 finding["component"] = [str(item) for item in finding["component"]]
@@ -297,6 +296,7 @@ def prepare_manifest_analysis_output(sha256):
     return encapsulate(manifest_analysis, computed_with)
 
 
+# Return the main activity and all declared activities
 def prepare_activities_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -317,6 +317,7 @@ def prepare_activities_output(sha256):
     return encapsulate(activities, computed_with)
 
 
+# Return the declared broadcast receivers
 def prepare_receivers_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -329,6 +330,7 @@ def prepare_receivers_output(sha256):
     return encapsulate(receivers, computed_with)
 
 
+# Return the declared services
 def prepare_services_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -341,6 +343,7 @@ def prepare_services_output(sha256):
     return encapsulate(services, computed_with)
 
 
+# Combine details, certificate, manifest and components into the app info section
 def prepare_apk_analysis_output(sha256):
     apk_details = prepare_apk_details_output(sha256)
     certificate_details = prepare_certificate_details_output(sha256)
@@ -361,9 +364,7 @@ def prepare_apk_analysis_output(sha256):
     return apk_analysis
 
 
-################################################# CODE ANALYSIS  #################################################
-
-
+# Return MobSF's NIAP compliance results
 def prepare_niap_analysis_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -375,6 +376,7 @@ def prepare_niap_analysis_output(sha256):
     return encapsulate(niap_analysis, computed_with)
 
 
+# Return MobSF's static code analysis findings
 def prepare_code_vulnerabilities_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -386,6 +388,7 @@ def prepare_code_vulnerabilities_output(sha256):
     return encapsulate(code_analysis, computed_with)
 
 
+# Combine NIAP and code vulnerabilities into the code analysis section
 def prepare_code_analysis_output(sha256):
     niap_analysis = prepare_niap_analysis_output(sha256)
     code_vulnerabilities = prepare_code_vulnerabilities_output(sha256)
@@ -398,9 +401,7 @@ def prepare_code_analysis_output(sha256):
     return code_analysis
 
 
-################################################# BEHAVIOR ANALYSIS  #################################################
-
-
+# Return Quark Engine's detected crimes with their confidence
 def prepare_threat_analysis_output(sha256):
     computed_with = ["quark_engine"]
     try:
@@ -419,6 +420,7 @@ def prepare_threat_analysis_output(sha256):
     return encapsulate(threat_analysis, computed_with)
 
 
+# Return the permissions MobSF found the APK requesting
 def prepare_permission_analysis_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -430,6 +432,7 @@ def prepare_permission_analysis_output(sha256):
     return encapsulate(permission_analysis, computed_with)
 
 
+# Return MobSF's Android API usage findings
 def prepare_detailed_permissions_analysis_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -441,6 +444,7 @@ def prepare_detailed_permissions_analysis_output(sha256):
     return encapsulate(detailed_permissions, computed_with)
 
 
+# Combine threats, permissions and API usage into the behavior section
 def prepare_behavior_analysis_output(sha256):
     threat_analysis = prepare_threat_analysis_output(sha256)
     permission_analysis = prepare_permission_analysis_output(sha256)
@@ -455,9 +459,7 @@ def prepare_behavior_analysis_output(sha256):
     return behavior_analysis
 
 
-################################################# NETWORK ANALYSIS  #################################################
-
-
+# Return the domains MobSF extracted from the APK
 def prepare_domain_analysis_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -469,6 +471,7 @@ def prepare_domain_analysis_output(sha256):
     return encapsulate(domains, computed_with)
 
 
+# Return the URLs MobSF extracted from the APK
 def prepare_url_analysis_output(sha256):
     computed_with = ["mobsf"]
     try:
@@ -480,6 +483,7 @@ def prepare_url_analysis_output(sha256):
     return encapsulate(urls, computed_with)
 
 
+# Combine domains and URLs into the network section
 def prepare_network_analysis_output(sha256):
     domains = prepare_domain_analysis_output(sha256)
     urls = prepare_url_analysis_output(sha256)
@@ -492,9 +496,7 @@ def prepare_network_analysis_output(sha256):
     return network_analysis
 
 
-################################################# FULL REPORT  #################################################
-
-
+# Build the full report from every section
 def prepare_report_output(sha256):
     fingerprints = prepare_fingerprints_output(sha256)
     threat_intelligence = prepare_threat_intelligence_output(sha256)

@@ -49,8 +49,6 @@ class VerdictSectionResponse(BaseModel):
 
     verdict: Envelope[VerdictResponse] | None = Field(default=None)
 
-################################################# FINGERPRINTS #################################################
-
 
 class ChecksumResponse(BaseModel):
     model_config = ConfigDict(
@@ -388,9 +386,6 @@ class FingerprintsResponse(BaseModel):
     fuzzy_hashes: Envelope[FuzzyHashesResponse] | None = Field(default=None)
 
 
-################################################# THREAT INTELLIGENCE #################################################
-
-
 class TimelineResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
@@ -655,8 +650,6 @@ class ThreatIntelligenceResponse(BaseModel):
         default=None, alias="third-party-apps"
     )
 
-
-################################################# APP INFO #################################################
 
 class FrostingResponse(BaseModel):
     model_config = ConfigDict(
@@ -1066,9 +1059,6 @@ class AppAnalysisResponse(BaseModel):
     services: Envelope[ServicesResponse] | None = Field(default=None)
 
 
-################################################# CODE ANALYSIS #################################################
-
-
 class NiapAnalysisResponse(RootModel[dict | None]):
     model_config = ConfigDict(json_schema_extra={"example": {}})
 
@@ -1245,9 +1235,6 @@ class CodeAnalysisResponse(BaseModel):
     )
 
 
-################################################# BEHAVIOR ANALYSIS #################################################
-
-
 class ThreatResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
@@ -1307,7 +1294,6 @@ class PermissionInfo(BaseModel):
         description="Full description of what the permission allows",
         examples=["Allows an application to read from external storage."],
     )
-
 
 
 class PermissionsResponse(RootModel[dict[str, PermissionInfo] | None]):
@@ -1466,9 +1452,6 @@ class BehaviorAnalysisResponse(BaseModel):
     detailed_permissions: Envelope[DetailedPermissionsResponse] | None = Field(
         default=None
     )
-
-
-################################################# NETWORK ANALYSIS #################################################
 
 
 class GeolocationResponse(BaseModel):
@@ -1671,9 +1654,6 @@ class NetworkAnalysisResponse(BaseModel):
 
     domains: Envelope[DomainsResponse] | None = Field(default=None)
     urls: Envelope[UrlsResponse] | None = Field(default=None)
-
-
-################################################# FULL REPORT #################################################
 
 
 class ReportResponse(BaseModel):
@@ -1904,9 +1884,6 @@ class ReportResponse(BaseModel):
     code_analysis: CodeAnalysisResponse | None = Field(default=None)
     behavior_analysis: BehaviorAnalysisResponse | None = Field(default=None)
     network_analysis: NetworkAnalysisResponse | None = Field(default=None)
-
-
-################################################# MISC #################################################
 
 
 class AnalyzeResponse(BaseModel):

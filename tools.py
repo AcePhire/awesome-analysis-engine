@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 from mobsf_handler import scan_file_in_mobsf, upload_file_to_mobsf
 from utils import csv_to_json, hash_file
 
-# Load environment variables
 load_dotenv()
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 MALWAREBAZAAR_API_KEY = os.getenv("MALWAREBAZAAR_API_KEY")
@@ -21,18 +20,17 @@ APK_DIR = Path(os.getenv("APK_DIR", "apk_files")).resolve()
 APK_VOLUME = os.getenv("APK_VOLUME", str(APK_DIR))
 TOOL_VOLUMES = {APK_VOLUME: {"bind": "/analysis", "mode": "ro"}}
 
-# Load docker daemon
 client = docker.from_env()
 
 
+# Map a local APK path to its path inside the tool containers
 def tool_path(path):
     return f"/analysis/{Path(path).resolve().relative_to(APK_DIR)}"
 
 
-# Analyze using MobSF
+# Upload and scan the APK with MobSF
 def mobsf_analysis(path):
     port = "8181"
-    # container = run_mobsf(port)
 
     try:
         hash = upload_file_to_mobsf(path)
@@ -44,10 +42,8 @@ def mobsf_analysis(path):
     print("mobsf_analysis.........complete!")
     return data
 
-    # container.stop()
 
-
-# Analyze using APKiD
+# Run APKiD in a container to identify packers, obfuscators and compilers
 def apkid_analysis(path):
     try:
         container = client.containers.run(
@@ -64,7 +60,7 @@ def apkid_analysis(path):
     return data
 
 
-# Analyze using ssdeep
+# Extract the DEX files, manifest and resources, then fuzzy hash them and the APK with ssdeep
 def ssdeep_analysis(path):
     with TemporaryDirectory(dir=APK_DIR) as tmp_dir:
         with zipfile.ZipFile(path, "r") as apk:
@@ -109,7 +105,7 @@ def ssdeep_analysis(path):
     return ssdeep_hashes
 
 
-# Analyze using Quark Engine
+# Run Quark Engine in a container to detect malicious behaviors
 def quark_engine_analysis(path):
     try:
         container = client.containers.run(
@@ -132,7 +128,7 @@ def quark_engine_analysis(path):
     return data
 
 
-# Analyze using AndroCFG
+# Run AndroCFG in a container to extract control-flow and call-graph rules
 def androcfg_analysis(path):
     try:
         container = client.containers.run(
@@ -150,7 +146,7 @@ def androcfg_analysis(path):
     return data
 
 
-# Analyze using VirusTotal
+# Look up the APK's hash on VirusTotal
 def virustotal_analysis(path):
     file_hash = hash_file(path)
 
@@ -168,7 +164,7 @@ def virustotal_analysis(path):
     return data
 
 
-# Analyze using Malware Bazaar
+# Look up the APK's hash on MalwareBazaar
 def malwarebazaar_analysis(path):
     file_hash = hash_file(path)
 
@@ -187,7 +183,7 @@ def malwarebazaar_analysis(path):
     return data
 
 
-# Get APK info
+# Run the apk_info container to extract metadata, signature and classes
 def apk_info_analysis(path):
     try:
         container = client.containers.run(
@@ -205,9 +201,8 @@ def apk_info_analysis(path):
     return data
 
 
-# Analyze using Yara Analyzer
+# Run the YARA analyzer container with the bundled Android rules
 def yara_analysis(path):
-    # The rules are baked into the image (yara_analyzer/rules)
     try:
         container = client.containers.run(
             "fukhara/yara_analyzer",

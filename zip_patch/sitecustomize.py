@@ -1,8 +1,3 @@
-# malicious APKs often carry deliberately malformed ZIP metadata that Android ignores but Python's zipfile rejects. Make zipfile read them the way Android does, so analysis tools can open the original, untouched APK:
-#   - malformed "extra field" blocks are skipped instead of raising BadZipFile
-#   - the "encrypted" flag is ignored (APKs are never encrypted)
-#   - an unknown compression method is read as stored (what Android does)
-#   - CRC-32 mismatches are ignored (Android never checks them)
 import zipfile
 
 _KNOWN_METHODS = (
@@ -16,6 +11,7 @@ _decode_extra = zipfile.ZipInfo._decodeExtra
 _read_contents = zipfile.ZipFile._RealGetContents
 
 
+# Parse a ZIP entry's extra field, skipping it when malformed
 def _tolerant_decode_extra(self, *args, **kwargs):
     try:
         _decode_extra(self, *args, **kwargs)
@@ -23,6 +19,7 @@ def _tolerant_decode_extra(self, *args, **kwargs):
         pass
 
 
+# Read the ZIP directory, then clear the encryption flag and treat unknown compression as stored
 def _tolerant_read_contents(self):
     _read_contents(self)
     for info in self.filelist:

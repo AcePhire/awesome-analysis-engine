@@ -1,4 +1,3 @@
-# The AndroCFG CLI only writes a Markdown report; print the JSON report instead.
 import json
 import sys
 import tempfile

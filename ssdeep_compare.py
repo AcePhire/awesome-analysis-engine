@@ -6,6 +6,7 @@ import ssdeep
 from mongodb_handler import get_fuzzy_hashes_collection
 
 
+# Compare an APK's ssdeep hashes against every stored hash and return the non-zero matches
 def hash_compare(sha256):
     source_hashes = list(
         get_fuzzy_hashes_collection().find({"tool": "ssdeep", "sha256": sha256})

@@ -14,25 +14,20 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from api_formatter import *
-from awesome_analysis_engine import TOOLS_TOTAL, analyze
+from engine import TOOLS_TOTAL, analyze
 from docs.api import *
 from mongodb_handler import (
     get_analysis_progress,
     get_analysis_status,
     list_apk_analyses,
 )
-
-# from ssdeep_compare import hash_compare
 from utils import hash_file
 
 APK_DIR = os.getenv("APK_DIR", "apk_files")
 os.makedirs(APK_DIR, exist_ok=True)
 
-# Keep references to running analyses so they aren't garbage collected
 analysis_tasks = set()
 
-# Metadata for each tag group — this is what renders as the section
-# headers/descriptions in Swagger UI (/docs) and ReDoc (/redoc).
 tags_metadata = [
     {
         "name": "Reports",
@@ -80,14 +75,13 @@ tags_metadata = [
     },
 ]
 
-################################################# API  #################################################
 
 app = FastAPI(openapi_tags=tags_metadata)
 
 logger = logging.getLogger("uvicorn.error")
 
 
-# a value can fall outside the documented schema. serve the data as-is and log the mismatch 
+# Return responses that don't match their schema as-is and log the mismatch
 @app.exception_handler(ResponseValidationError)
 async def serve_unvalidated_response(request, exc):
     problems = "; ".join(
@@ -105,11 +99,13 @@ app.add_middleware(
 )
 
 
+# Serve the upload page
 @app.get("/")
 async def home():
     return FileResponse("upload.html")
 
 
+# Save the upload under its SHA256 and start the analysis in the background
 @app.post(
     "/api/analyze/",
     summary="Submit an APK for analysis",
@@ -137,12 +133,7 @@ async def analyze_apk(
     return {"status": "success", "id": sha256}
 
 
-# SSDeep Compare
-# @app.get("/compare/ssdeep/{id}")
-# async def compare_ssdeep_hashes(id):
-# return hash_compare(id)
-
-
+# List the SHA256 of every analyzed APK
 @app.get(
     "/api/reports/",
     summary="List all APK analyses",
@@ -153,17 +144,7 @@ async def get_reports():
     return list_apk_analyses()
 
 
-# GET full Report
-# @app.get("/api/report/{id}/", response_class=EventSourceResponse)
-# async def get_report(id) -> AsyncIterable[ServerSentEvent]:
-#     data = prepare_report_output(id)
-
-#     while get_analysis_status(id) == "pending":
-#         yield ServerSentEvent(raw_data=json.dumps(data))
-#         await asyncio.sleep(5)
-#     yield ServerSentEvent(raw_data=json.dumps(data))
-
-
+# Return the full report
 @app.get(
     "/api/report/{id}/",
     summary="Get the full analysis report",
@@ -181,6 +162,7 @@ async def get_report(
     return data
 
 
+# Return the analysis status and which tools have finished
 @app.get(
     "/api/report/{id}/status/",
     summary="Get the analysis status",
@@ -207,8 +189,8 @@ async def get_status(
         "tools_total": TOOLS_TOTAL,
     }
 
-##########################################################################
 
+# Return the final verdict
 @app.get("/api/report/{id}/verdict/",
     summary="Get the sample's final verdict",
     description="Return the final verdict(malicious or not, severity, reason, response needed",
@@ -224,8 +206,8 @@ async def get_verdict(
 
     return data
 
-##########################################################################
 
+# Return the fingerprints section
 @app.get(
     "/api/report/{id}/fingerprints/",
     summary="Get fingerprints data",
@@ -243,6 +225,7 @@ async def get_fingerprints(
     return data
 
 
+# Return the file checksums
 @app.get(
     "/api/report/{id}/fingerprints/checksums/",
     summary="Get file checksums",
@@ -260,6 +243,7 @@ async def get_checksums(
     return data
 
 
+# Return the APKiD identifiers
 @app.get(
     "/api/report/{id}/fingerprints/identifiers/",
     summary="Get APK identifiers",
@@ -278,6 +262,7 @@ async def get_identifiers(
     return data
 
 
+# Return the fuzzy hashes
 @app.get(
     "/api/report/{id}/fingerprints/fuzzy-hashes/",
     summary="Get fuzzy hashes",
@@ -295,9 +280,7 @@ async def get_fuzzy_hashes(
     return data
 
 
-##########################################################################
-
-
+# Return the threat intelligence section
 @app.get(
     "/api/report/{id}/threat-intelligence/",
     summary="Get all threat intelligence data",
@@ -315,6 +298,7 @@ async def get_threat_intelligence(
     return data
 
 
+# Return the sample timeline
 @app.get(
     "/api/report/{id}/threat-intelligence/timeline/",
     summary="Get sample timeline",
@@ -332,6 +316,7 @@ async def get_sample_timeline(
     return data
 
 
+# Return the YARA matches
 @app.get(
     "/api/report/{id}/threat-intelligence/yara/",
     summary="Get YARA rule matches",
@@ -349,6 +334,7 @@ async def get_yara_analysis(
     return data
 
 
+# Return the popular AV detections
 @app.get(
     "/api/report/{id}/threat-intelligence/popular-av-detections/",
     summary="Get popular antivirus detections",
@@ -366,6 +352,7 @@ async def get_antivirus_detections(
     return data
 
 
+# Return the third-party lookup links
 @app.get(
     "/api/report/{id}/threat-intelligence/third-party-apps/",
     summary="Get 3rd-party lookup results",
@@ -383,9 +370,7 @@ async def get_third_party_apps(
     return data
 
 
-##########################################################################
-
-
+# Return the app info section
 @app.get(
     "/api/report/{id}/app/",
     summary="Get all app information",
@@ -403,6 +388,7 @@ async def get_app_analysis(
     return data
 
 
+# Return the app details
 @app.get(
     "/api/report/{id}/app/details/",
     summary="Get app details",
@@ -420,6 +406,7 @@ async def get_app_details(
     return data
 
 
+# Return the signing certificate details
 @app.get(
     "/api/report/{id}/app/certificate/",
     summary="Get signing certificate details",
@@ -437,6 +424,7 @@ async def get_app_certificate(
     return data
 
 
+# Return the manifest findings
 @app.get(
     "/api/report/{id}/app/manifests/",
     summary="Get app manifests",
@@ -454,6 +442,7 @@ async def get_app_manifests(
     return data
 
 
+# Return the declared activities
 @app.get(
     "/api/report/{id}/app/activities/",
     summary="Get app activities",
@@ -471,6 +460,7 @@ async def get_app_activities(
     return data
 
 
+# Return the declared receivers
 @app.get(
     "/api/report/{id}/app/receivers/",
     summary="Get app receivers",
@@ -488,6 +478,7 @@ async def get_app_receivers(
     return data
 
 
+# Return the declared services
 @app.get(
     "/api/report/{id}/app/services/",
     summary="Get app services",
@@ -505,9 +496,7 @@ async def get_app_services(
     return data
 
 
-##########################################################################
-
-
+# Return the code analysis section
 @app.get(
     "/api/report/{id}/code/",
     summary="Get all code analysis results",
@@ -525,6 +514,7 @@ async def get_code_analysis(
     return data
 
 
+# Return the NIAP compliance results
 @app.get(
     "/api/report/{id}/code/niap/",
     summary="Get NIAP analysis",
@@ -542,6 +532,7 @@ async def get_niap_analysis(
     return data
 
 
+# Return the code vulnerabilities
 @app.get(
     "/api/report/{id}/code/vulnerabilities/",
     summary="Get code vulnerabilities",
@@ -559,9 +550,7 @@ async def get_code_vulnerabilities(
     return data
 
 
-##########################################################################
-
-
+# Return the behavior analysis section
 @app.get(
     "/api/report/{id}/behavior/",
     summary="Get all behavior analysis results",
@@ -579,6 +568,7 @@ async def get_behavior_analysis(
     return data
 
 
+# Return the detected threats
 @app.get(
     "/api/report/{id}/behavior/threats/",
     summary="Get behavioral threats",
@@ -596,6 +586,7 @@ async def get_threats_analysis(
     return data
 
 
+# Return the requested permissions
 @app.get(
     "/api/report/{id}/behavior/permissions/",
     summary="Get permissions analysis",
@@ -613,6 +604,7 @@ async def get_permission_analysis(
     return data
 
 
+# Return the Android API usage findings
 @app.get(
     "/api/report/{id}/behavior/detailed-permissions/",
     summary="Get detailed permission analysis",
@@ -630,9 +622,7 @@ async def get_detailed_permissions(
     return data
 
 
-##########################################################################
-
-
+# Return the control-flow graph (not implemented yet)
 @app.get(
     "/api/report/{id}/control-flow/",
     summary="Get control-flow graph data",
@@ -648,9 +638,7 @@ async def get_control_flow(
     return output
 
 
-##########################################################################
-
-
+# Return the network analysis section
 @app.get(
     "/api/report/{id}/network/",
     summary="Get all network analysis",
@@ -668,6 +656,7 @@ async def get_network_analysis(
     return data
 
 
+# Return the extracted domains
 @app.get(
     "/api/report/{id}/network/domains/",
     summary="Get network domains",
@@ -685,6 +674,7 @@ async def get_domain_analysis(
     return data
 
 
+# Return the extracted URLs
 @app.get(
     "/api/report/{id}/network/urls/",
     summary="Get network URLs",

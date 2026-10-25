@@ -5,6 +5,7 @@ import json
 from androguard.misc import AnalyzeAPK
 from androguard import util as AndroUtil
 
+# Run the YARA rules over the raw APK, each DEX and every file inside it
 def scan_apk(apk_path: str, rules: yara.Rules) -> dict:
     results = {"apk": apk_path, "matches": [], "metadata": {}}
 

@@ -9,7 +9,7 @@ MOBSF_API_KEY = os.getenv("MOBSF_API_KEY")
 MOBSF_DOMAIN = os.getenv("MOBSF_URL", "http://127.0.0.1:8181")
 
 
-# Upload file to MobSF
+# Upload the APK to MobSF and return its hash, falling back to the local SHA256
 def upload_file_to_mobsf(path):
     file, directory = resolve_path(path)
 
@@ -30,7 +30,7 @@ def upload_file_to_mobsf(path):
         return hash_file(path)
 
 
-# Scan file in MobSF
+# Ask MobSF to scan an uploaded file and return the JSON report
 def scan_file_in_mobsf(hash):
     url = f"{MOBSF_DOMAIN}/api/v1/scan"
     headers = {"Authorization": MOBSF_API_KEY}
