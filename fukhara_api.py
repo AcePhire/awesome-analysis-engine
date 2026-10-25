@@ -1,24 +1,35 @@
 import asyncio
 import json
+import logging
+import os
 import shutil
+import uuid
 from typing import Annotated
 
-from fastapi import FastAPI, File, Path, UploadFile
+from fastapi import FastAPI, File, HTTPException, Path, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from pydantic_core.core_schema import TaggedUnionSchema
 
 from api_formatter import *
-from awesome_analysis_engine import analyze
+from awesome_analysis_engine import TOOLS_TOTAL, analyze
 from docs.api import *
 from mongodb_handler import (
+    get_analysis_progress,
     get_analysis_status,
     list_apk_analyses,
 )
 
 # from ssdeep_compare import hash_compare
 from utils import hash_file
+
+APK_DIR = os.getenv("APK_DIR", "apk_files")
+os.makedirs(APK_DIR, exist_ok=True)
+
+# Keep references to running analyses so they aren't garbage collected
+analysis_tasks = set()
 
 # Metadata for each tag group — this is what renders as the section
 # headers/descriptions in Swagger UI (/docs) and ReDoc (/redoc).
@@ -73,6 +84,19 @@ tags_metadata = [
 
 app = FastAPI(openapi_tags=tags_metadata)
 
+logger = logging.getLogger("uvicorn.error")
+
+
+# a value can fall outside the documented schema. serve the data as-is and log the mismatch 
+@app.exception_handler(ResponseValidationError)
+async def serve_unvalidated_response(request, exc):
+    problems = "; ".join(
+        f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+        for error in exc.errors()[:5]
+    )
+    logger.warning("%s does not match its response schema: %s", request.url.path, problems)
+    return JSONResponse(content=jsonable_encoder(exc.body))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -96,14 +120,19 @@ async def home():
 async def analyze_apk(
     file: Annotated[UploadFile, File(description="APK file to analyze")],
 ):
-    # Path("apk_files").mkdir(exist_ok=True)
-    path = f"apk_files/{file.filename}"
+    
+    upload_path = os.path.join(APK_DIR, f"{uuid.uuid4().hex}.upload")
 
-    with open(path, "wb") as buffer:
+    with open(upload_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    sha256 = hash_file(path)
-    asyncio.create_task(analyze(path))
+    sha256 = hash_file(upload_path)
+    path = os.path.join(APK_DIR, f"{sha256}.apk")
+    os.replace(upload_path, path)
+
+    task = asyncio.create_task(analyze(path))
+    analysis_tasks.add(task)
+    task.add_done_callback(analysis_tasks.discard)
 
     return {"status": "success", "id": sha256}
 
@@ -150,6 +179,33 @@ async def get_report(
     data = prepare_report_output(id)
 
     return data
+
+
+@app.get(
+    "/api/report/{id}/status/",
+    summary="Get the analysis status",
+    description="Return the analysis status (pending, completed or failed) and which tools have finished running",
+    tags=["Analysis Report"],
+    response_model=AnalysisStatusResponse,
+    responses={404: {"description": "No analysis exists for this ID"}},
+)
+async def get_status(
+    id: Annotated[
+        str, Path(description="Analysis report ID (SHA256 checksum of the APK file)")
+    ],
+):
+    progress = get_analysis_progress(id)
+
+    if progress is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    return {
+        "id": progress["sha256"],
+        "status": progress.get("status", "pending"),
+        "uploaded_at": progress.get("uploaded_at"),
+        "tools_done": progress.get("tools_done", []),
+        "tools_total": TOOLS_TOTAL,
+    }
 
 ##########################################################################
 
