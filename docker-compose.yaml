@@ -118,7 +118,7 @@ services:
 
   apk-info:
     build:
-      context: ./apk_info
+      context: ./tool_images/apk_info
       additional_contexts:
         zippatch: ./zip_patch
     image: fukhara/apk_info
@@ -128,7 +128,7 @@ services:
 
   yara-analyzer:
     build:
-      context: ./yara_analyzer
+      context: ./tool_images/yara_analyzer
       additional_contexts:
         zippatch: ./zip_patch
     image: fukhara/yara_analyzer
