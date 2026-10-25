@@ -1,39 +1,160 @@
-version: "3"
+name: fukhara
+
 services:
+  api:
+    build:
+      context: ./
+      additional_contexts:
+        zippatch: ./zip_patch
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/
+      MOBSF_URL: http://mobsf:8000
+      MOBSF_API_KEY: ${MOBSF_API_KEY:?Set MOBSF_API_KEY in .env}
+      APK_DIR: /data/apk_files
+      APK_VOLUME: fukhara_apk_files
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      MALWAREBAZAAR_API_KEY: ${MALWAREBAZAAR_API_KEY:-}
+    volumes:
+      - apk_files:/data/apk_files
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mobsf:
+        condition: service_healthy
+      apkid:
+        condition: service_completed_successfully
+      quark-engine:
+        condition: service_completed_successfully
+      androcfg:
+        condition: service_completed_successfully
+      ssdeep:
+        condition: service_completed_successfully
+      apk-info:
+        condition: service_completed_successfully
+      yara-analyzer:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - fukhara
+
   mongo:
-    # Pinned: mongo 8.x refuses to start on Linux kernel >= 6.19 (SERVER-121912)
-    image: mongo:7.0
-    restart: always
+    image: mongo:7.0.43
     environment:
-      MONGO_INITDB_ROOT_USERNAME: fukhara
-      MONGO_INITDB_ROOT_PASSWORD: fukhara
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?Set MONGO_USER in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Set MONGO_PASSWORD in .env}
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
     networks:
       - fukhara
-    ports:
-      - 27017:27017
-  mongo-express:
-    image: mongo-express
-    restart: always
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: fukhara
-      ME_CONFIG_MONGODB_ADMINPASSWORD: fukhara
-      ME_CONFIG_BASICAUTH_USERNAME: fukhara
-      ME_CONFIG_BASICAUTH_PASSWORD: fukhara
-      ME_CONFIG_MONGODB_URL: mongodb://fukhara:fukhara@mongo:27017/
-    networks:
-      - fukhara
-    ports:
-      - 8081:8081
+
   mobsf:
-    image: opensecurity/mobile-security-framework-mobsf:latest
+    build:
+      context: ./tool_images/mobsf
+      additional_contexts:
+        zippatch: ./zip_patch
+    image: fukhara/mobsf
     environment:
-      MOBSF_API_ONLY: 0
-      MOBSF_API_KEY: 515d3578262a2539cd13b5b9946fe17e350c321b91faeb1ee56095430242a4a9
+      MOBSF_API_ONLY: "0"
+      MOBSF_API_KEY: ${MOBSF_API_KEY:?Set MOBSF_API_KEY in .env}
     ports:
-      - 8181:8000
+      - "${MOBSF_PORT:-8181}:8000"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/login/')"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - fukhara
+
+  apkid:
+    build:
+      context: ./tool_images/apkid
+      additional_contexts:
+        zippatch: ./zip_patch
+    image: fukhara/apkid
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+  quark-engine:
+    build:
+      context: ./tool_images/quark_engine
+      additional_contexts:
+        zippatch: ./zip_patch
+    image: fukhara/quark-engine
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+  androcfg:
+    build: ./tool_images/androcfg
+    image: fukhara/androcfg
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+  ssdeep:
+    build: ./tool_images/ssdeep
+    image: fukhara/ssdeep
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+  apk-info:
+    build:
+      context: ./apk_info
+      additional_contexts:
+        zippatch: ./zip_patch
+    image: fukhara/apk_info
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+  yara-analyzer:
+    build:
+      context: ./yara_analyzer
+      additional_contexts:
+        zippatch: ./zip_patch
+    image: fukhara/yara_analyzer
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+  mongo-express:
+    image: mongo-express:1.0.2-20-alpine3.19
+    profiles: [debug]
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_PASSWORD}
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - fukhara
+
 volumes:
-  opensearch_data:
+  mongo_data:
+  apk_files:
+    name: fukhara_apk_files
 
 networks:
   fukhara:
-    driver: bridge
